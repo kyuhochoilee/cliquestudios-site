@@ -18,10 +18,20 @@ export const metadata: Metadata = {
     template: "%s — Clique Studios",
   },
   description:
-    "We design and ship software for personal operations, small communities, and the underserved edges of the web. Everything we build solves a real problem we were losing sleep over.",
+    "Clique Studios — a people-first creative software studio in San Francisco, building for communities.",
   icons: {
     icon: "/favicon.svg",
   },
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover" as const,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fafaf9" },
+    { media: "(prefers-color-scheme: dark)", color: "#0c0a09" },
+  ],
 };
 
 export default function RootLayout({
@@ -35,7 +45,7 @@ export default function RootLayout({
       className={`${inter.variable} ${geistMono.variable}`}
       suppressHydrationWarning
     >
-      <body className="antialiased min-h-screen flex flex-col">
+      <body className="antialiased">
         {children}
       </body>
     </html>
