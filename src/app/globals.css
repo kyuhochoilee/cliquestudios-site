@@ -1,0 +1,173 @@
+@import "tailwindcss";
+
+/* ============================================
+   DESIGN TOKENS
+   ============================================ */
+
+:root {
+  /* --- Palette --- */
+  --color-bg: #fafaf9;
+  --color-fg: #1c1917;
+  --color-muted: #78716c;
+  --color-subtle: #d6d3d1;
+  --color-border: #e7e5e4;
+  --color-surface: #ffffff;
+  --color-accent: #1c1917;
+  --color-orange: #ff8c78;
+  --color-orange-soft: rgba(200, 168, 130, 0.12);
+  --color-purple: #9333ea;
+  --color-purple-soft: rgba(147, 51, 234, 0.12);
+
+  /* --- Typography --- */
+  --font-display: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
+  --font-sans: var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+  --leading-tight: 1.15;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.7;
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+
+  /* --- Spacing (4px base) --- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-24: 6rem;
+  --space-32: 8rem;
+
+  /* Safe zones */
+  --header-safe: calc(72px + env(safe-area-inset-top, 0px));
+
+  /* --- Radii --- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* --- Shadows --- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+
+  /* --- Transitions --- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --header-safe: 110px;
+  }
+}
+
+/* --- Dark mode tokens --- */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light-override) {
+    --color-bg: #0c0a09;
+    --color-fg: #fafaf9;
+    --color-muted: #a8a29e;
+    --color-subtle: #44403c;
+    --color-border: #292524;
+    --color-surface: #1c1917;
+    --color-accent: #fafaf9;
+    --color-orange: #2dd4bf;
+    --color-orange-soft: rgba(45, 212, 191, 0.12);
+    --color-purple: #a855f7;
+    --color-purple-soft: rgba(168, 85, 247, 0.15);
+  }
+}
+
+:root.dark {
+  --color-bg: #0c0a09;
+  --color-fg: #fafaf9;
+  --color-muted: #a8a29e;
+  --color-subtle: #44403c;
+  --color-border: #292524;
+  --color-surface: #1c1917;
+  --color-accent: #fafaf9;
+  --color-orange: #5eead4;
+  --color-orange-soft: rgba(94, 234, 212, 0.12);
+  --color-purple: #a855f7;
+  --color-purple-soft: rgba(168, 85, 247, 0.15);
+}
+
+/* ============================================
+   TAILWIND THEME BRIDGE
+   ============================================ */
+
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-fg: var(--color-fg);
+  --color-muted: var(--color-muted);
+  --color-subtle: var(--color-subtle);
+  --color-border: var(--color-border);
+  --color-surface: var(--color-surface);
+  --color-accent: var(--color-accent);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--color-bg);
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-tight);
+}
+
+.subheading {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-orange);
+}
+
+::selection {
+  background: var(--color-fg);
+  color: var(--color-bg);
+}
+
+.contact-email-link {
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+.contact-email-link:hover {
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
