@@ -270,7 +270,6 @@ body {
   translate: var(--reg-x) var(--reg-y);
 }
 .blob-face g,
-.blob-face .wink,
 .blob-face .mouth {
   transform-box: fill-box;
   transform-origin: center;

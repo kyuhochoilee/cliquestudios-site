@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { CAST, roundedPolygon, type Char } from "./cast";
+import { CAST, makeFace, roundedPolygon, type Char } from "./cast";
 
 /**
  * Five ink creatures on a sheet of paper. Physics and a small state machine
@@ -54,8 +54,9 @@ type Blob = {
   paths: SVGPathElement[];
   face: SVGSVGElement;
   eyesG: SVGGElement | null;
-  pupilsG: SVGGElement | null;
-  wink: SVGElement[];
+  pupils: SVGGElement[];
+  pupilRange: number[];
+  lids: { el: SVGElement; span: number }[];
   ax: number; axUntil: number; anchorX: number; anchorY: number; // squash axis + anchor after a push
   mouth: SVGElement | null;
   d: number;
@@ -171,7 +172,7 @@ export default function Blobs() {
       el.style.height = `${d}px`;
       const body = el.querySelector<SVGSVGElement>(".blob-body")!;
       const face = el.querySelector<SVGSVGElement>(".blob-face")!;
-      body.style.setProperty("--ink", c.ink);
+      el.style.setProperty("--ink", c.ink); // body ink and eyelids share it
       body.style.setProperty("--falloff", `${c.falloff}deg`);
       body.classList.add(c.ink2 ? "tex-light" : "tex-dark");
       const paths = Array.from(body.querySelectorAll<SVGPathElement>("path"));
@@ -185,7 +186,7 @@ export default function Blobs() {
       }
       const g = body.querySelector("g");
       if (g) g.setAttribute("filter", d < 65 ? "url(#riso-edge-sm)" : "url(#riso-edge)");
-      face.innerHTML = c.face;
+      face.innerHTML = makeFace(c, c.name.toLowerCase());
       const r = (d * c.fill) / 2;
       const spot = openSpot(r);
       const way = openSpot(r);
@@ -194,8 +195,9 @@ export default function Blobs() {
         shadow: el.querySelector<HTMLDivElement>(".blob-shadow")!,
         pop: el.querySelector<HTMLDivElement>(".blob-pop")!,
         eyesG: face.querySelector<SVGGElement>(".eyes"),
-        pupilsG: face.querySelector<SVGGElement>(".pupils"),
-        wink: Array.from(face.querySelectorAll<SVGElement>(".wink")),
+        pupils: Array.from(face.querySelectorAll<SVGGElement>(".pupils")),
+        pupilRange: [c.eyes.l, c.eyes.r].map((e) => Math.max(0, e.r - e.pr - 1)),
+        lids: Array.from(face.querySelectorAll<SVGElement>(".lid")).map((el) => ({ el, span: Number(el.getAttribute("data-span")) })),
         ax: 0, axUntil: 0, anchorX: 0, anchorY: 0,
         mouth: face.querySelector<SVGElement>(".mouth"),
         d, r, scale,
@@ -427,7 +429,7 @@ export default function Blobs() {
         b.qv += 3 * sqGain(b);
         if (dx || dy) { b.heading = Math.atan2(dy, dx); lookAt(b, { kind: "point", x: b.x + dx * 120, y: b.y + dy * 120 }, 1, 0.5); }
       } else launch(b);
-      b.fatigue += 0.03;
+      b.fatigue += 0.03 * (1 - 0.8 * b.c.P.jumpy) * (0.3 + 0.7 * b.c.napProne); // hoppers don't tire of hopping
       b.hold = 1;
       b.forceRender = true;
       return true;
@@ -773,7 +775,7 @@ export default function Blobs() {
             b.nextThink = t + 0.25;
             if (think(b)) return;
             const napP = (0.02 + 0.1 * b.fatigue * (1 - P.restless)) * (1 + 3 * b.c.napProne) * (pointer.known ? 1 : 2);
-            if (b.fatigue > 0.35 || rand() < napP * 0.25 * (b.c.napProne + 0.05)) { go(b, "nap"); return; }
+            if (b.fatigue > 0.35 + 0.6 * (1 - b.c.napProne) || rand() < napP * 0.25 * b.c.napProne * b.c.napProne) { go(b, "nap"); return; }
             if (b.mood > 0.6) { go(b, "celebrate"); return; }
             if (rand() < 0.4 && !b.gaze) {
               const r = rand();
@@ -845,7 +847,7 @@ export default function Blobs() {
           if (t > b.nextThink) {
             b.nextThink = t + 0.25;
             if (think(b)) return;
-            if (b.fatigue > 0.6 && rand() < 0.0125) { go(b, "nap"); return; }
+            if (b.fatigue > 0.6 + 0.4 * (1 - b.c.napProne) && rand() < 0.0125) { go(b, "nap"); return; }
           }
           break;
         }
@@ -1202,25 +1204,31 @@ export default function Blobs() {
           gx = (dx / dd) * reach; gy = (dy / dd) * reach;
         }
         const jx = c.eyeJitter && b.tremble && !reduced ? Math.round((rand() - 0.5) * 2) : 0;
-        if (c.gazeOn === "face") {
-          set(b, "face", b.face, "transform", `translate(${Math.round(ox + gx + jx)}px, ${Math.round(oy + gy)}px) rotate(${faceRot.toFixed(3)}rad)`);
-        } else {
-          set(b, "face", b.face, "transform", `translate(${Math.round(ox + jx)}px, ${Math.round(oy)}px) rotate(${faceRot.toFixed(3)}rad)`);
-          const pr = c.pupilRange;
+        set(b, "face", b.face, "transform", `translate(${Math.round(ox + jx)}px, ${Math.round(oy)}px) rotate(${faceRot.toFixed(3)}rad)`);
+        // pupils look around inside the whites
+        b.pupils.forEach((g, k) => {
+          const pr = b.pupilRange[k];
           const px = clamp((gx / b.scale) * 0.6, -pr, pr), py = clamp((gy / b.scale) * 0.6, -pr, pr);
-          set(b, "pup", b.pupilsG, "transform", `translate(${px.toFixed(1)}px, ${py.toFixed(1)}px)${b.dilate ? " scale(1.25)" : ""}`);
-        }
+          set(b, `pup${k}`, g, "transform", `translate(${px.toFixed(1)}px, ${py.toFixed(1)}px)${b.dilate ? " scale(1.25)" : ""}`);
+        });
+        // lids: 0 open .. 0.75 shut. Resting droop per character, bored droop when idle, wide when surprised.
         const blinking = t < b.blinkUntil;
         const happy = t < b.happyUntil;
-        let lid = 1;
-        if (b.napping) lid = 0.12;
-        else if (blinking && !b.winking) lid = 0.12;
-        else if (b.squint) lid = 0.55;
-        else if (happy) lid = 0.35;
+        let lid = c.eyes.lidRest;
+        if (b.state === "idle") lid = Math.max(lid, Math.min(0.3, (b.stateT - 3) * 0.05));
+        if (b.state === "nap") lid = 0.75;
+        else if (b.squint) lid = 0.6;
+        else if (happy) lid = 0.5;
+        if (b.eyeScale > 1.05) lid = 0;
+        if (blinking && !b.winking) lid = 0.75;
+        lid = Math.round(lid * 8) / 8; // posed, not eased
+        b.lids.forEach((l, k) => {
+          const amt = blinking && b.winking && k === 1 ? 0.75 : lid;
+          set(b, `lid${k}`, l.el, "transform", `translate(0px, ${((amt - 1) * l.span).toFixed(1)}px)`);
+        });
         set(b, "cheeks", b.cheeks, "transform", happy ? "scale(1.35)" : "none");
         const es = b.eyeScale;
-        set(b, "eyes", b.eyesG, "transform", `scale(${q(es, 0.05)}, ${q(es * lid, 0.05)})`);
-        b.wink.forEach((w, k) => set(b, `wink${k}`, w, "transform", blinking && b.winking ? "scaleY(0.12)" : "none"));
+        set(b, "eyes", b.eyesG, "transform", es === 1 ? "none" : `scale(${q(es, 0.05)})`);
         set(b, "mouth", b.mouth, "transform", t < b.grinUntil ? "scaleX(1.2)" : "none");
       }
     };

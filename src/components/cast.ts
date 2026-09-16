@@ -41,8 +41,6 @@ export type Char = {
   flinchForce: number;
   gaze: number;
   gazeHeading: boolean;
-  gazeOn: "face" | "pupils";
-  pupilRange: number;
   eyeSpring: [number, number];
   blink: [number, number];
   blinkDur: number;
@@ -51,26 +49,29 @@ export type Char = {
   eyeJitter: boolean;
   napProne: number;
   shy: boolean;
-  face: string;
+  eyes: { l: Eye; r: Eye; lidRest: number; lidLine: boolean };
+  extras: string; // brows, mouth, cheeks: inline SVG in the same 0..100 box
 };
+
+export type Eye = { cx: number; cy: number; r: number; pr: number };
 
 const deg = (d: number) => (d * Math.PI) / 180;
 
 export const CAST: Char[] = [
   {
-    // A zippy little dart, thrilled by everything.
+    // A zippy little square, thrilled by everything.
     name: "Fizz",
-    ink: "#f15060",
-    ink2: "#c81f3c",
+    ink: "#ff48b0",
+    ink2: "#d61f87",
     ink2Alpha: 0.45,
     falloff: 115,
-    verts: [[50, 8], [88, 34], [80, 86], [30, 92], [12, 44]],
-    radius: 5,
-    fill: 0.8,
-    bottom: 92,
-    nose: deg(-90),
-    lean: 0,
-    size: 54,
+    verts: [[24, 20], [80, 26], [76, 80], [20, 76]],
+    radius: 20,
+    fill: 0.72,
+    bottom: 80,
+    nose: null,
+    lean: deg(15),
+    size: 58,
     P: { speed: 0.95, restless: 0.7, social: 0.4, jumpy: 0.85, squishy: 0.3 },
     gait: "dart",
     boil: 2.5,
@@ -84,8 +85,6 @@ export const CAST: Char[] = [
     flinchForce: 1.2,
     gaze: 1.5,
     gazeHeading: false,
-    gazeOn: "face",
-    pupilRange: 0,
     eyeSpring: [520, 18],
     blink: [900, 2200],
     blinkDur: 80,
@@ -94,10 +93,9 @@ export const CAST: Char[] = [
     eyeJitter: false,
     napProne: 0,
     shy: false,
-    face:
-      '<g class="eyes"><g class="pupils"><circle cx="42" cy="42" r="6.5"/><circle cx="58" cy="40" r="6.5"/><circle cx="44.5" cy="39.5" r="2" fill="#fff"/><circle cx="60.5" cy="37.5" r="2" fill="#fff"/></g></g>' +
-      '<g class="brows" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M35 31 Q42 26 49 30"/><path d="M52 29 Q58 24 65 29"/></g>' +
-      '<path class="mouth" d="M46 53 Q50 57 54 53" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>',
+    eyes: { l: { cx: 38, cy: 46, r: 9.5, pr: 5 }, r: { cx: 62, cy: 46, r: 9.5, pr: 5 }, lidRest: 0, lidLine: true },
+    extras:
+      '<path class="mouth" d="M45 62 Q50 67 55 62" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>',
   },
   {
     // A heavy, contented loaf that is asleep more often than not.
@@ -126,8 +124,6 @@ export const CAST: Char[] = [
     flinchForce: 0.3,
     gaze: 0.5,
     gazeHeading: false,
-    gazeOn: "pupils",
-    pupilRange: 2.5,
     eyeSpring: [200, 16],
     blink: [5000, 9000],
     blinkDur: 450,
@@ -136,10 +132,9 @@ export const CAST: Char[] = [
     eyeJitter: false,
     napProne: 1,
     shy: false,
-    face:
-      '<g class="eyes"><path d="M23 56 A9 9 0 0 0 41 56 Z" fill="#fff"/><path d="M59 56 A9 9 0 0 0 77 56 Z" fill="#fff"/>' +
-      '<g class="pupils"><path d="M27.5 56 A4.5 4.5 0 0 0 36.5 56 Z"/><path d="M63.5 56 A4.5 4.5 0 0 0 72.5 56 Z"/></g>' +
-      '<path d="M22 56 L42 56 M58 56 L78 56" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></g>',
+    eyes: { l: { cx: 32, cy: 54, r: 9, pr: 4.5 }, r: { cx: 68, cy: 54, r: 9, pr: 4.5 }, lidRest: 0.55, lidLine: true },
+    extras:
+      "",
   },
   {
     // Wide-eyed and nosy; comes over to see what you are doing.
@@ -168,8 +163,6 @@ export const CAST: Char[] = [
     flinchForce: 0,
     gaze: 1.6,
     gazeHeading: false,
-    gazeOn: "pupils",
-    pupilRange: 5,
     eyeSpring: [380, 20],
     blink: [2500, 4000],
     blinkDur: 120,
@@ -178,9 +171,9 @@ export const CAST: Char[] = [
     eyeJitter: false,
     napProne: 0.1,
     shy: false,
-    face:
-      '<g class="eyes"><circle cx="36" cy="48" r="13" fill="#fff"/><circle cx="62" cy="48" r="13" fill="#fff"/>' +
-      '<g class="pupils"><circle cx="39" cy="49" r="7"/><circle cx="59" cy="49" r="7"/><circle cx="41.5" cy="46" r="2" fill="#fff"/><circle cx="61.5" cy="46" r="2" fill="#fff"/></g></g>',
+    eyes: { l: { cx: 36, cy: 48, r: 13, pr: 7 }, r: { cx: 62, cy: 48, r: 13, pr: 7 }, lidRest: 0, lidLine: true },
+    extras:
+      "",
   },
   {
     // A plump, bashful pear that blushes when anyone comes close.
@@ -209,8 +202,6 @@ export const CAST: Char[] = [
     flinchForce: 0.4,
     gaze: 0.9,
     gazeHeading: false,
-    gazeOn: "pupils",
-    pupilRange: 4,
     eyeSpring: [340, 18],
     blink: [2000, 3800],
     blinkDur: 130,
@@ -219,10 +210,9 @@ export const CAST: Char[] = [
     eyeJitter: false,
     napProne: 0.15,
     shy: true,
-    face:
+    eyes: { l: { cx: 38, cy: 46, r: 11, pr: 6 }, r: { cx: 62, cy: 46, r: 11, pr: 6 }, lidRest: 0.1, lidLine: true },
+    extras:
       '<g class="cheeks" fill="#ff48b0" opacity="0.8"><ellipse cx="26" cy="59" rx="6.5" ry="3.8"/><ellipse cx="74" cy="59" rx="6.5" ry="3.8"/></g>' +
-      '<g class="eyes"><circle cx="38" cy="46" r="11" fill="#fff"/><circle cx="62" cy="46" r="11" fill="#fff"/>' +
-      '<g class="pupils"><circle cx="40" cy="47" r="6"/><circle cx="60" cy="47" r="6"/><circle cx="42" cy="44.5" r="1.8" fill="#fff"/><circle cx="62" cy="44.5" r="1.8" fill="#fff"/></g></g>' +
       '<path class="mouth" d="M45 62 Q47.5 65.5 50 62 Q52.5 65.5 55 62" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>',
   },
   {
@@ -252,8 +242,6 @@ export const CAST: Char[] = [
     flinchForce: 0.6,
     gaze: 0.4,
     gazeHeading: true,
-    gazeOn: "pupils",
-    pupilRange: 4,
     eyeSpring: [300, 15],
     blink: [1800, 3500],
     blinkDur: 100,
@@ -262,12 +250,32 @@ export const CAST: Char[] = [
     eyeJitter: false,
     napProne: 0.05,
     shy: false,
-    face:
-      '<g class="eyes"><circle cx="39" cy="44" r="12" fill="#fff"/><circle class="wink" cx="62" cy="41" r="9" fill="#fff"/>' +
-      '<g class="pupils"><circle cx="41" cy="45" r="6.5"/><circle class="wink" cx="63" cy="42" r="5"/><circle cx="43" cy="42.5" r="2" fill="#fff"/><circle class="wink" cx="64.5" cy="40" r="1.5" fill="#fff"/></g></g>' +
+    eyes: { l: { cx: 39, cy: 44, r: 12, pr: 6.5 }, r: { cx: 62, cy: 41, r: 9, pr: 5 }, lidRest: 0, lidLine: true },
+    extras:
       '<path class="mouth" d="M43 60 Q51 72 59 60 Z"/>',
   },
 ];
+
+/** Inline SVG for a face: whites, pupils with a catchlight, and an ink-colored lid per eye. */
+export function makeFace(c: Char, uid: string): string {
+  const eye = (e: Eye, k: string) => {
+    const id = `eye-${uid}-${k}`;
+    const s = e.r * 2 + 2;
+    const x = e.cx - e.r - 1;
+    const y = e.cy - e.r - 1;
+    return (
+      `<clipPath id="${id}"><circle cx="${e.cx}" cy="${e.cy}" r="${e.r}"/></clipPath>` +
+      `<g class="eye" clip-path="url(#${id})">` +
+      `<circle cx="${e.cx}" cy="${e.cy}" r="${e.r}" fill="#fff"/>` +
+      `<g class="pupils"><circle cx="${e.cx}" cy="${e.cy + 0.5}" r="${e.pr}"/>` +
+      `<circle cx="${e.cx + e.pr * 0.35}" cy="${e.cy - e.pr * 0.4}" r="${Math.max(1.2, e.pr * 0.3).toFixed(1)}" fill="#fff"/></g>` +
+      `<g class="lid" data-span="${s}"><rect x="${x}" y="${y}" width="${s}" height="${s}" fill="var(--ink)"/>` +
+      (c.eyes.lidLine ? `<path d="M${x} ${y + s} H${x + s}" stroke="currentColor" stroke-width="2.5" fill="none"/>` : "") +
+      `</g></g>`
+    );
+  };
+  return `<g class="eyes">${eye(c.eyes.l, "l")}${eye(c.eyes.r, "r")}</g>` + c.extras;
+}
 
 /** Closed path through `verts` with rounded corners, with an optional per-vertex jitter. */
 export function roundedPolygon(
