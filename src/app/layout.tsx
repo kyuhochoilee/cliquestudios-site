@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Figtree } from "next/font/google";
 import localFont from "next/font/local";
-import RisoDefs from "@/components/RisoDefs";
 import "./globals.css";
 
 // Fraunces sets only the wordmark, so this is a glyph subset ("Clique Studios")
@@ -66,7 +65,6 @@ export default function RootLayout({
       className={`${fraunces.variable} ${figtree.variable}`}
     >
       <body className="antialiased">
-        <RisoDefs />
         {children}
       </body>
     </html>
