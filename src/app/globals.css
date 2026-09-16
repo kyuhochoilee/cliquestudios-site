@@ -316,3 +316,39 @@ body {
     }
   }
 }
+
+/* Sleep Z's: hand-drawn, black drum, float up from a napping head */
+.blob-zs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.blob-z {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 30%;
+  height: 30%;
+  color: var(--color-fg);
+  opacity: 0;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+/* Cartoon marks above the head (ha ha, anger cross, !, ?, heart, dizzy) */
+.blob-emote {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 37.5%;
+  color: var(--color-fg);
+  opacity: 0;
+  transform-origin: 50% 100%;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.blob-face .brow {
+  transform-box: fill-box;
+  transform-origin: center;
+}

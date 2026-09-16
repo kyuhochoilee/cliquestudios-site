@@ -269,13 +269,46 @@ export function makeFace(c: Char, uid: string): string {
       `<circle cx="${e.cx}" cy="${e.cy}" r="${e.r}" fill="#fff"/>` +
       `<g class="pupils"><circle cx="${e.cx}" cy="${e.cy + 0.5}" r="${e.pr}"/>` +
       `<circle cx="${e.cx + e.pr * 0.35}" cy="${e.cy - e.pr * 0.4}" r="${Math.max(1.2, e.pr * 0.3).toFixed(1)}" fill="#fff"/></g>` +
-      `<g class="lid" data-span="${s}"><rect x="${x}" y="${y}" width="${s}" height="${s}" fill="var(--ink)"/>` +
+      `<g class="lid" data-span="${s}" style="transform:translate(0px,${-s}px)"><rect x="${x}" y="${y}" width="${s}" height="${s}" fill="var(--ink)"/>` +
       (c.eyes.lidLine ? `<path d="M${x} ${y + s} H${x + s}" stroke="currentColor" stroke-width="2.5" fill="none"/>` : "") +
+      `</g>` +
+      // lower lid: slides up with an arched edge, so a happy eye closes into a ^
+      `<g class="lidlo" data-span="${s}" style="transform:translate(0px,${s}px)">` +
+      `<path d="M${x} ${y + 4} Q${e.cx} ${y - 3} ${x + s} ${y + 4} V${y + s} H${x} Z" fill="var(--ink)"/>` +
+      `<path d="M${x} ${y + 4} Q${e.cx} ${y - 3} ${x + s} ${y + 4}" stroke="currentColor" stroke-width="2.5" fill="none"/>` +
       `</g></g>`
     );
   };
-  return `<g class="eyes">${eye(c.eyes.l, "l")}${eye(c.eyes.r, "r")}</g>` + c.extras;
+  const brow = (e: Eye) =>
+    `<path class="brow" d="M${e.cx - 5.5} ${e.cy - e.r - 5} Q${e.cx} ${e.cy - e.r - 8.5} ${e.cx + 5.5} ${e.cy - e.r - 5}"/>`;
+  return (
+    `<g class="eyes">${eye(c.eyes.l, "l")}${eye(c.eyes.r, "r")}</g>` +
+    `<g class="brows" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" opacity="0">${brow(c.eyes.l)}${brow(c.eyes.r)}</g>` +
+    c.extras
+  );
 }
+
+/** Cartoon marks that pop up above a head. 40 x 30 box, drawn in the black drum. */
+export const EMOTES: Record<string, string> = {
+  laugh:
+    '<g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M3 5 L3 17 M3 11 Q6 9 8 11 L8 17"/><path d="M15 12 Q12 11 12 14 Q12 17 15 16.5 L15 11 L15 17"/>' +
+    '<path d="M22 6 L22 18 M22 12 Q25 10 27 12 L27 18"/><path d="M34 13 Q31 12 31 15 Q31 18 34 17.5 L34 12 L34 18"/></g>',
+  angry:
+    '<g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">' +
+    '<path d="M14 5 Q13 11 8 13"/><path d="M26 5 Q27 11 32 13"/><path d="M8 19 Q13 21 14 27"/><path d="M32 19 Q27 21 26 27"/></g>',
+  bang:
+    '<g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">' +
+    '<path d="M20 3 L19.5 17"/><path d="M19.5 23 L19.5 24"/><path d="M9 7 L12 11" stroke-width="2"/><path d="M31 7 L28 11" stroke-width="2"/></g>',
+  q:
+    '<g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">' +
+    '<path d="M13 9 Q13 2 20 2.5 Q27 3 26 9 Q25 13 20 14 L20 18"/><path d="M20 24 L20 25"/></g>',
+  heart:
+    '<path d="M20 27 C9 19 7 11 13 7.5 C16.5 6 19.5 8 20 11 C20.5 8 23.5 6 27 7.5 C33 11 31 19 20 27 Z" fill="currentColor"/>',
+  dizzy:
+    '<g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">' +
+    '<path d="M20 15 m-8 0 a8 8 0 1 1 16 0 a5.5 5.5 0 1 1 -11 0 a3 3 0 1 1 6 0"/><path d="M4 6 L8 10 M8 6 L4 10"/><path d="M32 4 L36 8 M36 4 L32 8"/></g>',
+};
 
 /** Closed path through `verts` with rounded corners, with an optional per-vertex jitter. */
 export function roundedPolygon(

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { CAST, makeFace, roundedPolygon, type Char } from "./cast";
+import { CAST, EMOTES, makeFace, roundedPolygon, type Char } from "./cast";
 
 /**
  * Five ink creatures on a sheet of paper. Physics and a small state machine
@@ -10,6 +10,12 @@ import { CAST, makeFace, roundedPolygon, type Char } from "./cast";
  */
 
 const FPS = 24; // motion at 24, the outline boil still re-rolls at 12
+const Z_LIFE = 2.6; // seconds a sleep Z takes to float away
+const Z_PATHS = [
+  "M3.5 4.5 C7 3.5 11 4 15.5 3.5 L4 15.5 C8 15 12 15.5 16.5 15",
+  "M3 4 C6.5 4.5 10.5 3 15 4 L4.5 15 C9 16 12.5 14.5 16 15.5",
+  "M4 3.5 C8 4 12 3 16 4.5 L3.5 16 C7.5 15.5 11 16.5 15.5 15",
+];
 const FRAME = 1 / FPS;
 const TAU = Math.PI * 2;
 
@@ -57,6 +63,12 @@ type Blob = {
   pupils: SVGGElement[];
   pupilRange: number[];
   lids: { el: SVGElement; span: number }[];
+  lidlos: { el: SVGElement; span: number }[];
+  browsG: SVGElement | null;
+  brows: SVGElement[];
+  emote: SVGSVGElement;
+  emoteG: SVGGElement;
+  emoteKind: string; emoteBorn: number; emoteDur: number; nextEmote: number;
   ax: number; axUntil: number; anchorX: number; anchorY: number; // squash axis + anchor after a push
   mouth: SVGElement | null;
   d: number;
@@ -72,6 +84,8 @@ type Blob = {
   blinkAt: number; blinkUntil: number; winking: boolean; secondBlinkAt: number;
   happyUntil: number; dilate: boolean; grinUntil: number;
   cheeks: SVGElement | null;
+  zs: { el: SVGElement; path: SVGPathElement; born: number; dx: number; rot: number }[]; // sleep Z's
+  nextZ: number;
   tremble: number; boilMul: number; hold: number;
   state: StateName; prev: StateName; stateT: number; until: number; nextThink: number;
   partner: Blob | null; grudge: Blob | null; role: "chaser" | "flee" | null; initiator: boolean;
@@ -198,6 +212,12 @@ export default function Blobs() {
         pupils: Array.from(face.querySelectorAll<SVGGElement>(".pupils")),
         pupilRange: [c.eyes.l, c.eyes.r].map((e) => Math.max(0, e.r - e.pr - 1)),
         lids: Array.from(face.querySelectorAll<SVGElement>(".lid")).map((el) => ({ el, span: Number(el.getAttribute("data-span")) })),
+        lidlos: Array.from(face.querySelectorAll<SVGElement>(".lidlo")).map((el) => ({ el, span: Number(el.getAttribute("data-span")) })),
+        browsG: face.querySelector<SVGElement>(".brows"),
+        brows: Array.from(face.querySelectorAll<SVGElement>(".brow")),
+        emote: el.querySelector<SVGSVGElement>(".blob-emote")!,
+        emoteG: el.querySelector<SVGGElement>(".blob-emote g")!,
+        emoteKind: "", emoteBorn: -99, emoteDur: 0, nextEmote: 0,
         ax: 0, axUntil: 0, anchorX: 0, anchorY: 0,
         mouth: face.querySelector<SVGElement>(".mouth"),
         d, r, scale,
@@ -210,6 +230,8 @@ export default function Blobs() {
         blinkAt: 1 + rand() * 3, blinkUntil: 0, winking: false, secondBlinkAt: 0,
         happyUntil: 0, dilate: false, grinUntil: 0,
         cheeks: face.querySelector<SVGElement>(".cheeks"),
+        zs: Array.from(el.querySelectorAll<SVGElement>(".blob-z")).map((z) => ({ el: z, path: z.querySelector("path")!, born: -99, dx: 0, rot: 0 })),
+        nextZ: 0,
         tremble: 0, boilMul: 1, hold: c.hold,
         state: "idle", prev: "idle", stateT: 0, until: 1 + rand() * 2, nextThink: 0.5,
         partner: null, grudge: null, role: null, initiator: false,
@@ -351,6 +373,13 @@ export default function Blobs() {
         b.stp = null;
         b.hold = b.hop ? 1 : b.c.hold;
       }
+    };
+    // A cartoon mark above the head for a moment.
+    const showEmote = (b: Blob, kind: string, dur: number) => {
+      if (b.emoteKind !== kind) { b.emoteG.innerHTML = EMOTES[kind] ?? ""; b.emoteKind = kind; }
+      b.emoteBorn = t;
+      b.emoteDur = dur;
+      b.forceRender = true;
     };
     // A shove becomes a stumble (one discrete step) instead of a slide.
     const stumble = (b: Blob, vx: number, vy: number, delay = 0) => {
@@ -536,6 +565,7 @@ export default function Blobs() {
           b.eyeScale = 1.15;
           b.eyeScaleUntil = t + 4;
           b.hv += 0.8;
+          showEmote(b, "q", 1.6);
           if (!b.curiousT) b.curiousT = { kind: "pointer" };
           if (b.until < t + 1) b.until = t + 1.5 + 2.5 * rand();
           break;
@@ -544,6 +574,7 @@ export default function Blobs() {
           const power = opts.power ?? 0.9 * b.c.P.jumpy;
           b.coolStartle = t + 1.5;
           eyeWide(b, 0.25);
+          showEmote(b, "bang", 0.9);
           lookAt(b, { kind: "point", x: src.x, y: src.y }, 1, 1.2);
           const dx = b.x - src.x, dy = b.y - src.y;
           const dd = Math.hypot(dx, dy) || 1;
@@ -568,6 +599,8 @@ export default function Blobs() {
           b.grudge = opts.grudge ?? null;
           b.until = t + 3 + 5 * (1 - b.c.P.social);
           b.hold = 2;
+          showEmote(b, "angry", 2.4);
+          b.nextEmote = t + 4;
           b.boilMul = 0.5;
           b.squint = 0.55;
           const right = b.grudge ? b.grudge.x > b.x : rand() < 0.5;
@@ -580,6 +613,7 @@ export default function Blobs() {
           b.hopsLeft = 3 + Math.round(2 * rand());
           b.until = t + 2.6;
           b.eyeScale = 1.2;
+          showEmote(b, "laugh", 2.4);
           b.eyeScaleUntil = t + 2.6;
           b.boilMul = 2;
           b.nextHopAt = t;
@@ -854,6 +888,17 @@ export default function Blobs() {
         case "nap": {
           b.qTarget = 0.08 + 0.05 * Math.sin(TAU * 0.35 * b.stateT);
           b.fatigue = Math.max(0, b.fatigue - 0.08 * dt);
+          // a hand-drawn Z drifts up every second or so
+          if (t > b.nextZ && b.stateT > 0.6) {
+            b.nextZ = t + 1 + 0.5 * rand();
+            const z = b.zs.find((z) => t - z.born > Z_LIFE);
+            if (z) {
+              z.born = t;
+              z.dx = (rand() - 0.5) * 0.5;
+              z.rot = (rand() - 0.5) * 30;
+              z.path.setAttribute("d", Z_PATHS[Math.floor(rand() * Z_PATHS.length)]);
+            }
+          }
           if (rand() < 0.1 * dt) { b.sv += 0.6 * sqGain(b); b.forceRender = true; }
           if (pointer.known && dist(b, pointer) < b.r + 60) { b.mood -= 0.4; startle(b, pointer.x, pointer.y, 0.8 * P.jumpy); return; }
           if (t > b.until) {
@@ -941,7 +986,7 @@ export default function Blobs() {
             if (t > b.until) { b.greetPhase = 2; const first = P.social >= p.c.P.social; b.nextHopAt = first ? t : t + 3 * FRAME; b.hopsLeft = rand() < 0.3 ? 2 : 1; }
           } else if (b.greetPhase === 2) {
             if (t > b.nextHopAt && !b.hop && b.hopsLeft > 0) { startHop(b, 0, 0, 0.15); b.hopsLeft--; b.nextHopAt = t + 0.5; }
-            if (b.hopsLeft === 0 && !b.hop) { b.greetPhase = 3; b.until = t + 0.6; b.mood += 0.2; }
+            if (b.hopsLeft === 0 && !b.hop) { b.greetPhase = 3; b.until = t + 0.6; b.mood += 0.2; showEmote(b, "heart", 1.3); }
           } else {
             b.qTarget = 0.03 * Math.sin(TAU * 0.8 * b.stateT);
             if (t > b.until && b.initiator) {
@@ -964,6 +1009,7 @@ export default function Blobs() {
           break;
         }
         case "sulk": {
+          if (t > b.nextEmote) { b.nextEmote = t + 4 + 2 * rand(); showEmote(b, "angry", 2); }
           if (b.stateT < 1 && b.grudge) {
             const dx = b.x - b.grudge.x, dy = b.y - b.grudge.y;
             const dd = Math.hypot(dx, dy) || 1;
@@ -1013,7 +1059,7 @@ export default function Blobs() {
         }
         case "thrown": {
           if (b.hop) return;
-          if (!b.dizzy) { b.dizzy = true; b.hv = (rand() < 0.5 ? -1 : 1) * 6; b.evx += 120 * (rand() - 0.5); b.tremble = 1; b.until = t + 0.8; }
+          if (!b.dizzy) { b.dizzy = true; b.hv = (rand() < 0.5 ? -1 : 1) * 6; b.evx += 120 * (rand() - 0.5); b.tremble = 1; b.until = t + 0.8; showEmote(b, "dizzy", 1.1); }
           if (t > b.until) {
             b.tremble = 0;
             b.mood -= 0.3;
@@ -1216,9 +1262,10 @@ export default function Blobs() {
         const happy = t < b.happyUntil;
         let lid = c.eyes.lidRest;
         if (b.state === "idle") lid = Math.max(lid, Math.min(0.3, (b.stateT - 3) * 0.05));
+        const laughing = b.state === "celebrate";
+        const angry = b.state === "sulk";
         if (b.state === "nap") lid = 0.75;
-        else if (b.squint) lid = 0.6;
-        else if (happy) lid = 0.5;
+        else if (angry) lid = 0.5;
         if (b.eyeScale > 1.05) lid = 0;
         if (blinking && !b.winking) lid = 0.75;
         lid = Math.round(lid * 8) / 8; // posed, not eased
@@ -1226,10 +1273,54 @@ export default function Blobs() {
           const amt = blinking && b.winking && k === 1 ? 0.75 : lid;
           set(b, `lid${k}`, l.el, "transform", `translate(0px, ${((amt - 1) * l.span).toFixed(1)}px)`);
         });
+        // lower lids rise for a happy ^ ^ (laughing, bashful)
+        const lo = laughing || happy ? 0.6 : 0;
+        b.lidlos.forEach((l, k) => set(b, `lidlo${k}`, l.el, "transform", `translate(0px, ${((1 - lo) * l.span).toFixed(1)}px)`));
+        // brows: angry V, sad, raised, or one cocked
+        const browMode = angry ? "angry" : b.state === "thrown" && b.dizzy ? "sad" : b.state === "startled" || laughing || b.eyeScale > 1.2 ? "up" : b.state === "curious" ? "quiz" : "";
+        set(b, "browsG", b.browsG, "opacity", browMode ? "1" : "0");
+        const browT = (k: number) => {
+          const sgn = k === 0 ? 1 : -1;
+          if (browMode === "angry") return `translate(0px, 2px) rotate(${sgn * 22}deg)`;
+          if (browMode === "sad") return `translate(0px, 1px) rotate(${-sgn * 18}deg)`;
+          if (browMode === "up") return "translate(0px, -4px)";
+          if (browMode === "quiz") return k === 0 ? "translate(0px, -5px)" : "rotate(-10deg)";
+          return "none";
+        };
+        b.brows.forEach((el, k) => set(b, `brow${k}`, el, "transform", browT(k)));
         set(b, "cheeks", b.cheeks, "transform", happy ? "scale(1.35)" : "none");
         const es = b.eyeScale;
         set(b, "eyes", b.eyesG, "transform", es === 1 ? "none" : `scale(${q(es, 0.05)})`);
-        set(b, "mouth", b.mouth, "transform", t < b.grinUntil ? "scaleX(1.2)" : "none");
+        // mouth: opens wide for a laugh, flips to a frown when sulking
+        set(b, "mouth", b.mouth, "transform", laughing ? "scale(1.4)" : angry ? "scale(1, -1)" : t < b.grinUntil ? "scaleX(1.2)" : "none");
+        // cartoon mark above the head: pops in, jiggles, fades out, all in posed frames
+        {
+          const age = t - b.emoteBorn;
+          if (age > b.emoteDur) set(b, "emo", b.emote, "opacity", "0");
+          else {
+            const f = Math.floor(age * 12);
+            const left = b.emoteDur - age;
+            const sc = f === 0 ? 0.5 : f === 1 ? 1.15 : 1;
+            const rot = f < 2 ? 0 : f % 4 < 2 ? 4 : -4;
+            const op = left < 0.25 ? 0.25 : left < 0.5 ? 0.5 : 1;
+            const x = b.d * 0.5 - b.d * 0.25;
+            const y = b.d * (c.bottom / 100 - 0.95) - b.d * 0.34;
+            set(b, "emo", b.emote, "opacity", String(op));
+            set(b, "emot", b.emote, "transform", `translate(${Math.round(x)}px, ${Math.round(y)}px) rotate(${rot}deg) scale(${sc})`);
+          }
+        }
+        // sleep Z's: float up from the head in stop-motion steps, growing and fading
+        b.zs.forEach((z, k) => {
+          const age = t - z.born;
+          if (age > Z_LIFE) { set(b, `z${k}`, z.el, "opacity", "0"); return; }
+          const p = Math.floor((age / Z_LIFE) * 14) / 14;
+          const x = b.d * 0.62 + z.dx * b.d * p + Math.sin(p * 7) * b.d * 0.05;
+          const y = b.d * (c.bottom / 100 - 0.95) - p * b.d * 0.8;
+          const sc = 0.55 + 0.6 * p;
+          const op = p < 0.55 ? 1 : Math.round((1 - (p - 0.55) / 0.45) * 4) / 4;
+          set(b, `z${k}`, z.el, "opacity", String(op));
+          set(b, `zt${k}`, z.el, "transform", `translate(${Math.round(x)}px, ${Math.round(y)}px) rotate(${z.rot.toFixed(0)}deg) scale(${sc.toFixed(2)})`);
+        });
       }
     };
 
@@ -1287,9 +1378,14 @@ export default function Blobs() {
     document.addEventListener("visibilitychange", onVis);
     if (process.env.NODE_ENV === "development") {
       // dev hooks: inspect the cast and advance the simulation by hand
-      const w = window as unknown as { __blobs: Blob[]; __blobTick: (dt: number, n: number) => void };
+      const w = window as unknown as {
+        __blobs: Blob[];
+        __blobTick: (dt: number, n: number) => void;
+        __blobGo: (i: number, s: StateName, opts?: Parameters<typeof go>[2]) => void;
+      };
       w.__blobs = blobs;
       w.__blobTick = (dt, n) => { for (let i = 0; i < n; i++) tick(dt); };
+      w.__blobGo = (i, s, opts) => go(blobs[i], s, opts);
     }
     render();
     raf = requestAnimationFrame(loop);
@@ -1317,6 +1413,16 @@ export default function Blobs() {
               </g>
             </svg>
             <svg className="blob-face" viewBox="0 0 100 100" overflow="visible" />
+          </div>
+          <svg className="blob-emote" viewBox="0 0 40 30" overflow="visible">
+            <g />
+          </svg>
+          <div className="blob-zs">
+            {[0, 1, 2].map((k) => (
+              <svg key={k} className="blob-z" viewBox="0 0 20 20" overflow="visible">
+                <path d={Z_PATHS[k]} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ))}
           </div>
         </div>
       ))}
