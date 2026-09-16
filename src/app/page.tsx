@@ -17,8 +17,11 @@ export default function Home() {
       </section>
 
       <div className="wordmark-print" data-keep>
-        <h1 className="wordmark" data-text="Clique Studios">
-          Clique Studios
+        <h1 className="wordmark" aria-label="Clique Studios">
+          {/* three drums, each landing a hair off: the overlap prints dark, the edges show the inks */}
+          <span className="pass pass-y" aria-hidden="true">Clique Studios</span>
+          <span className="pass pass-p" aria-hidden="true">Clique Studios</span>
+          <span className="pass pass-b" aria-hidden="true">Clique Studios</span>
         </h1>
       </div>
 

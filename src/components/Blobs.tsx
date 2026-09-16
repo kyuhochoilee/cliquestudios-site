@@ -81,6 +81,7 @@ type Blob = {
   emoteInk1: SVGGElement;
   hovered: boolean; pressAt: number; pressX: number; pressY: number;
   bornAt: number; popped: boolean;
+  tapCount: number; lastTap: number;
   emoteKind: string; emoteBorn: number; emoteDur: number; nextEmote: number;
   impact: SVGSVGElement; impactBorn: number; impactX: number; impactY: number; impactAngle: number; impactSize: number;
   ax: number; axUntil: number; anchorX: number; anchorY: number; // squash axis + anchor after a push
@@ -193,6 +194,7 @@ export default function Blobs() {
 
     // ---------- build ----------
     const blobs: Blob[] = [];
+    const releases: ((e: PointerEvent) => void)[] = [];
     const els = Array.from(root.children) as HTMLDivElement[];
     els.forEach((el, i) => {
       if (i >= count) {
@@ -243,6 +245,7 @@ export default function Blobs() {
         emoteInk1: el.querySelector<SVGGElement>(".blob-emote .ink1")!,
         hovered: false, pressAt: -9, pressX: 0, pressY: 0,
         bornAt: 0.6 + i * 0.8 + rand() * 0.1, popped: false, // one at a time
+        tapCount: 0, lastTap: -9,
         impactBorn: -99, impactX: 0, impactY: 0, impactAngle: 0, impactSize: 1,
         impact: el.querySelector<SVGSVGElement>(".blob-impact")!,
         emoteKind: "", emoteBorn: -99, emoteDur: 0, nextEmote: 0,
@@ -305,15 +308,9 @@ export default function Blobs() {
         b.grabbed = false;
         el.classList.remove("is-grabbed");
         if (e.pointerType === "touch") pointer.expire = t + 0.8;
-        // a quick tap: a delighted boing, no throw
+        // a quick tap: each character reacts its own way, no throw
         if (t - b.pressAt < 0.28 && Math.hypot(e.clientX - b.pressX, e.clientY - b.pressY) < 8) {
-          b.vx = 0; b.vy = 0;
-          go(b, "idle");
-          b.until = t + 1.6;
-          startHop(b, 0, 0, 0.35);
-          b.happyUntil = t + 1.3;
-          b.mood += 0.3;
-          showEmote(b, "laugh", 1.3);
+          tapReact(b);
           return;
         }
         const past = b.hist.find((h) => t - h.t >= 0.06) ?? b.hist[0];
@@ -339,9 +336,15 @@ export default function Blobs() {
       };
       el.addEventListener("pointerup", release);
       el.addEventListener("pointercancel", release);
+      el.addEventListener("lostpointercapture", release);
+      releases.push(release);
     });
+    // a held character is always let go when the button is no longer down, wherever the pointer is
+    const releaseAll = (e: PointerEvent) => { for (const r of releases) r(e); };
+    window.addEventListener("pointerup", releaseAll);
 
     const onMove = (e: PointerEvent) => {
+      if (e.pointerType === "mouse" && e.buttons === 0) for (const r of releases) r(e); // button came up somewhere we didn't hear
       const now = performance.now();
       const dtp = Math.max(0.008, (now - pointer.lastT) / 1000);
       if (pointer.known && pointer.lastT) {
@@ -443,6 +446,58 @@ export default function Blobs() {
       b.emoteBorn = t;
       b.emoteDur = dur;
       b.forceRender = true;
+    };
+    // What each character does when you tap it. Tap the same one three times fast and it gets annoyed (except Bop).
+    const tapReact = (b: Blob) => {
+      b.tapCount = t - b.lastTap < 2.5 ? b.tapCount + 1 : 1;
+      b.lastTap = t;
+      b.vx = 0; b.vy = 0;
+      go(b, "idle");
+      b.until = t + 1.6;
+      if (b.tapCount >= 3 && b.c.name !== "Bop") {
+        b.tapCount = 0;
+        b.mood -= 0.5;
+        go(b, "sulk", { grudge: null });
+        return;
+      }
+      switch (b.c.name) {
+        case "Fizz": // thrilled: a big hop and a "!"
+          eyeWide(b, 0.5);
+          showEmote(b, "bang", 0.9);
+          startHop(b, 0, 0, 0.7);
+          b.mood += 0.2;
+          break;
+        case "Loaf": // disturbed: a slow blink, a wobble, a "?"
+          showEmote(b, rand() < 0.6 ? "q" : "dizzy", 1.2);
+          b.blinkUntil = t + 0.45;
+          b.qv += 2 * sqGain(b);
+          b.fatigue = Math.max(0, b.fatigue - 0.2);
+          break;
+        case "Pip": // delighted: little hop, happy eyes, a heart
+          startHop(b, 0, 0, 0.35);
+          b.happyUntil = t + 1.3;
+          showEmote(b, "heart", 1.3);
+          b.mood += 0.3;
+          break;
+        case "Nib": { // bashful: blushes, happy eyes, sidesteps away from you
+          b.happyUntil = t + 1.6;
+          showEmote(b, "heart", 1.4);
+          b.coolPuff = t + 5;
+          const ax = b.x - pointer.x, ay = b.y - pointer.y;
+          const ad = Math.hypot(ax, ay) || 1;
+          b.stepAt = 0;
+          step(b, ax / ad, ay / ad, 40, 0.5);
+          b.mood += 0.2;
+          break;
+        }
+        default: // Bop: three hops and a laugh
+          b.tx = b.x; b.ty = b.y;
+          startHop(b, 0, 0, 0.35);
+          b.hopQueue = [0.45, 0.6];
+          b.happyUntil = t + 1.6;
+          showEmote(b, "laugh", 1.6);
+          b.mood += 0.3;
+      }
     };
     // A shove becomes a stumble (one discrete step) instead of a slide.
     const stumble = (b: Blob, vx: number, vy: number, delay = 0) => {
@@ -1502,6 +1557,7 @@ export default function Blobs() {
       cancelAnimationFrame(raf);
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", releaseAll);
       document.documentElement.removeEventListener("pointerleave", onLeave);
       window.removeEventListener("blur", onLeave);
       window.removeEventListener("resize", measure);

@@ -9,7 +9,10 @@
   --color-fg: #1b1917; /* riso black sits warm in the fiber */
   --color-body: #6b6864;
   --color-link: #1b1917;
-  --riso-fringe: #0078bf; /* second drum under the wordmark, a hair off */
+  --ink-pink: #ff48b0;
+  --ink-blue: #0078bf;
+  --ink-yellow: #ffe800;
+  --ink-navy: #002a8a; /* what blue over pink prints as */
   --reg-x: 2px; /* page-wide misregistration of the black drum */
   --reg-y: -1px;
 
@@ -85,7 +88,8 @@ body {
   rotate: -1.5deg;
   font-size: 0.875rem;
   line-height: 1.3rem;
-  color: var(--color-body);
+  color: var(--ink-navy);
+  text-shadow: 0.7px -0.5px 0 var(--ink-pink), -0.7px 0.5px 0 var(--ink-blue);
   text-wrap: pretty;
   animation: appear 1200ms var(--ease-out) 700ms both;
 }
@@ -120,7 +124,7 @@ body {
   margin-top: 0.9rem;
 }
 .note a {
-  color: var(--color-link);
+  color: inherit;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -172,17 +176,31 @@ body {
   animation: resolve 1600ms var(--ease-out) both;
 }
 
-/* A second color drum printed under the black, landing a hair off */
-.wordmark::before {
-  content: attr(data-text);
+/* Three drums stacked: yellow, pink, blue. They multiply where they overlap and each lands a hair off. */
+.wordmark .pass {
+  display: block;
+  mix-blend-mode: multiply;
+}
+.wordmark .pass + .pass {
   position: absolute;
   inset: 0;
-  z-index: -1;
-  color: var(--riso-fringe);
-  -webkit-text-stroke-color: var(--riso-fringe);
-  mix-blend-mode: multiply;
-  translate: calc(-1 * var(--reg-x)) calc(-1 * var(--reg-y));
-  pointer-events: none;
+}
+.wordmark .pass-y {
+  color: var(--ink-yellow);
+  -webkit-text-stroke-color: var(--ink-yellow);
+  translate: -1.5px 1.2px;
+}
+.wordmark .pass-p {
+  color: var(--ink-pink);
+  -webkit-text-stroke-color: var(--ink-pink);
+  translate: 1.6px -0.8px;
+  opacity: 0.94;
+}
+.wordmark .pass-b {
+  color: var(--ink-blue);
+  -webkit-text-stroke-color: var(--ink-blue);
+  translate: -0.4px -1.6px;
+  opacity: 0.94;
 }
 
 @keyframes resolve {
