@@ -668,6 +668,8 @@ export default function Blobs() {
       b.prev = b.state;
       b.state = next;
       b.stateT = 0;
+      // leaving the hand for anything but a throw puts it back on the ground
+      if (b.prev === "grabbed" && next !== "thrown") { b.alt = 0; b.power = 0; }
       b.forceRender = true;
       b.tremble = 0;
       b.squint = 0;

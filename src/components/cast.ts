@@ -343,8 +343,8 @@ export const IMPACTS: string[] = [
 ];
 
 /** Accessories: a hat or glasses drawn in the black drum with an ink fill that lands a hair off. */
-export type Accessory = "none" | "specs" | "shades" | "party" | "beanie" | "bow" | "crown" | "flower" | "tophat";
-export const ACCESSORIES: Accessory[] = ["none", "specs", "shades", "party", "beanie", "bow", "crown", "flower", "tophat"];
+export type Accessory = "none" | "specs" | "frames" | "party" | "beanie" | "bow" | "crown" | "flower" | "tophat";
+export const ACCESSORIES: Accessory[] = ["none", "specs", "frames", "party", "beanie", "bow", "crown", "flower", "tophat"];
 
 export function makeAccessory(kind: Accessory, c: Char): string {
   if (kind === "none") return "";
@@ -361,12 +361,13 @@ export function makeAccessory(kind: Accessory, c: Char): string {
       return `<g class="acc" fill="none" stroke="currentColor" stroke-width="2.6">` +
         `<circle cx="${l.cx}" cy="${l.cy}" r="${l.r + 3.5}"/><circle cx="${r.cx}" cy="${r.cy}" r="${r.r + 3.5}"/>` +
         `<path d="M${l.cx + l.r + 3.5} ${l.cy - 2} Q${(l.cx + r.cx) / 2} ${l.cy - 6} ${r.cx - r.r - 3.5} ${r.cy - 2}"/></g>`;
-    case "shades":
-      return `<g class="acc">` +
-        `<circle cx="${l.cx}" cy="${l.cy}" r="${l.r + 3}" fill="${INKS.blue}" opacity="0.55" style="mix-blend-mode:multiply"/>` +
-        `<circle cx="${r.cx}" cy="${r.cy}" r="${r.r + 3}" fill="${INKS.blue}" opacity="0.55" style="mix-blend-mode:multiply"/>` +
-        `<g fill="none" stroke="currentColor" stroke-width="2.6"><circle cx="${l.cx}" cy="${l.cy}" r="${l.r + 3}"/><circle cx="${r.cx}" cy="${r.cy}" r="${r.r + 3}"/>` +
-        `<path d="M${l.cx - l.r - 3} ${l.cy - 4} L${r.cx + r.r + 3} ${r.cy - 4}"/></g></g>`;
+    case "frames": {
+      // rounded-square frames, clear lenses
+      const w = l.r + 3.5;
+      const rr = (e: Eye) => `<rect x="${e.cx - w}" y="${e.cy - w}" width="${w * 2}" height="${w * 2}" rx="${w * 0.45}"/>`;
+      return `<g class="acc" fill="none" stroke="currentColor" stroke-width="2.8">${rr(l)}${rr(r)}` +
+        `<path d="M${l.cx + w} ${l.cy - 2} L${r.cx - w} ${r.cy - 2}"/></g>`;
+    }
     case "party":
       return `<g class="acc" transform="rotate(-8 ${hx} ${hy})">` +
         pair(`M${hx - 13} ${hy + 3} L${hx} ${hy - 27} L${hx + 13} ${hy + 3} Z`, INKS.pink) +
