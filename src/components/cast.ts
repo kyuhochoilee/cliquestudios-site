@@ -36,7 +36,7 @@ export type Char = {
   sClamp: [number, number];
   spring: [number, number];
   headingRate: number;
-  throwCap: number;
+  mass: number;
   flinchReach: number;
   flinchForce: number;
   gaze: number;
@@ -71,7 +71,7 @@ export const CAST: Char[] = [
     nose: deg(-90),
     lean: 0,
     size: 54,
-    P: { speed: 0.95, restless: 1, social: 0.4, jumpy: 0.85, squishy: 0.3 },
+    P: { speed: 0.95, restless: 0.7, social: 0.4, jumpy: 0.85, squishy: 0.3 },
     gait: "dart",
     boil: 2.5,
     hold: 1,
@@ -79,9 +79,9 @@ export const CAST: Char[] = [
     sClamp: [-0.5, 0.7],
     spring: [220, 14],
     headingRate: 1,
-    throwCap: 1,
+    mass: 0.6,
     flinchReach: 140,
-    flinchForce: 2,
+    flinchForce: 1.2,
     gaze: 1.5,
     gazeHeading: false,
     gazeOn: "face",
@@ -91,7 +91,7 @@ export const CAST: Char[] = [
     blinkDur: 80,
     doubleP: 0.3,
     winkP: 0,
-    eyeJitter: true,
+    eyeJitter: false,
     napProne: 0,
     shy: false,
     face:
@@ -121,7 +121,7 @@ export const CAST: Char[] = [
     sClamp: [-0.45, 0.5],
     spring: [90, 6],
     headingRate: 1,
-    throwCap: 0.6,
+    mass: 3.2,
     flinchReach: 30,
     flinchForce: 0.3,
     gaze: 0.5,
@@ -163,7 +163,7 @@ export const CAST: Char[] = [
     sClamp: [-0.4, 0.6],
     spring: [150, 9],
     headingRate: 1,
-    throwCap: 1,
+    mass: 1,
     flinchReach: 0,
     flinchForce: 0,
     gaze: 1.6,
@@ -204,7 +204,7 @@ export const CAST: Char[] = [
     sClamp: [-0.4, 0.5],
     spring: [120, 8],
     headingRate: 1,
-    throwCap: 1,
+    mass: 1.7,
     flinchReach: 60,
     flinchForce: 0.4,
     gaze: 0.9,
@@ -246,7 +246,7 @@ export const CAST: Char[] = [
     sClamp: [-0.7, 0.7],
     spring: [150, 7],
     headingRate: 1,
-    throwCap: 1,
+    mass: 0.7,
     flinchReach: 40,
     flinchForce: 0.6,
     gaze: 0.4,

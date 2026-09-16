@@ -69,7 +69,7 @@ type Blob = {
   startleAt: number; startleX: number; startleY: number; startlePower: number; celebrateAt: number;
   tx: number; ty: number; retarget: number;
   dashing: boolean; dashUntil: number; nextDash: number; dashX: number; dashY: number; dashSp: number; dt2: number; dtUntil: number;
-  hopQueue: number[]; sulkX: number; sulkY: number; dizzy: boolean;
+  hopQueue: number[]; sulkX: number; sulkY: number; dizzy: boolean; stepAt: number; stickUntil: number;
   grabbed: boolean; gx: number; gy: number; hist: { x: number; y: number; t: number }[];
   forceRender: boolean;
   last: Record<string, string>;
@@ -95,8 +95,8 @@ export default function Blobs() {
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const small = window.innerWidth < 640;
-    const count = small ? 3 : CAST.length;
-    const sizeMul = small ? 0.72 : 1;
+    const count = CAST.length;
+    const sizeMul = small ? 0.62 : 1;
     const content = document.querySelector<HTMLElement>(".content");
 
     // ---------- world ----------
@@ -204,7 +204,7 @@ export default function Blobs() {
         startleAt: 0, startleX: 0, startleY: 0, startlePower: 0, celebrateAt: 0,
         tx: way.x, ty: way.y, retarget: 3 + rand() * 4,
         dashing: false, dashUntil: 0, nextDash: 1 + rand(), dashX: 1, dashY: 0, dashSp: 0, dt2: 0, dtUntil: 0,
-        hopQueue: [], sulkX: 0, sulkY: 0, dizzy: false,
+        hopQueue: [], sulkX: 0, sulkY: 0, dizzy: false, stepAt: 0, stickUntil: 0,
         grabbed: false, gx: 0, gy: 0, hist: [],
         forceRender: true,
         last: {},
@@ -239,7 +239,7 @@ export default function Blobs() {
           b.vx = (b.x - past.x) / dtp;
           b.vy = (b.y - past.y) / dtp;
           sp = Math.hypot(b.vx, b.vy);
-          const max = 2400 * b.c.throwCap;
+          const max = 2400 / Math.sqrt(b.c.mass);
           if (sp > max) { b.vx *= max / sp; b.vy *= max / sp; sp = max; }
         }
         if (sp > 500) go(b, "thrown");
@@ -273,8 +273,17 @@ export default function Blobs() {
 
     // ---------- helpers ----------
     const sqGain = (b: Blob) => 0.6 + 0.8 * b.c.P.squishy;
-    const amble = (b: Blob) => (40 + 40 * b.c.P.speed) * ({ dart: 1, drift: 0.2, amble: 1.2, hoppy: 1 }[b.c.gait]);
     const vmax = (b: Blob) => 60 + 90 * b.c.P.speed;
+    // Discrete steps instead of gliding: a push, a little bounce, then a dead stop.
+    const step = (b: Blob, ux: number, uy: number, strength: number, interval: number) => {
+      if (t < b.stepAt) return;
+      b.stepAt = t + interval;
+      const m = Math.pow(b.c.mass, 0.35); // heavy ones lumber
+      b.vx += (ux * strength * 1.35) / m;
+      b.vy += (uy * strength * 1.35) / m;
+      b.qv -= 1.4 * sqGain(b);
+      b.forceRender = true;
+    };
     const dist = (a: { x: number; y: number }, c: { x: number; y: number }) => Math.hypot(c.x - a.x, c.y - a.y);
 
     const lookAt = (b: Blob, g: Gaze, w: number, dur: number) => { b.gaze = g; b.gazeW = w; b.gazeUntil = t + dur; };
@@ -351,7 +360,7 @@ export default function Blobs() {
     };
     const launch = (b: Blob) => {
       const h = b.hop!;
-      const L = 300 + 400 * h.power;
+      const L = (300 + 400 * h.power) / Math.pow(b.c.mass, 0.3);
       b.vx += h.dx * L;
       b.vy += h.dy * L;
       b.qv -= 5 * sqGain(b);
@@ -363,9 +372,9 @@ export default function Blobs() {
     };
     const onLand = (b: Blob) => {
       const h = b.hop!;
-      b.qv += (3 + 2 * h.power) * sqGain(b);
-      b.vx *= h.ground ? 0.05 : 0.35;
-      b.vy *= h.ground ? 0.05 : 0.35;
+      b.qv += (3 + 2 * h.power) * sqGain(b) * Math.min(2, Math.sqrt(b.c.mass)); // heavy ones thud
+      b.vx *= h.ground ? 0.05 : 0.2;
+      b.vy *= h.ground ? 0.05 : 0.2;
       b.evx += b.vx * 0.4;
       b.evy += b.vy * 0.4;
       b.shKick = 0.18;
@@ -437,7 +446,7 @@ export default function Blobs() {
           pickWaypoint(b);
           b.boilMul = 1.2;
           b.dashing = false;
-          b.nextDash = t + 0.3 + rand();
+          b.nextDash = t + 1 + 2 * rand();
           b.nextThink = t + 0.25;
           break;
         case "nap":
@@ -568,12 +577,15 @@ export default function Blobs() {
     };
     const bump = (b: Blob, other: Blob, nx: number, ny: number, impact: number) => {
       b.heading = Math.atan2(ny, nx);
-      b.sv -= Math.min(3.5, impact / 300) * sqGain(b);
+      // squash along the contact normal; the light one takes most of the deformation
+      const sq = (Math.min(0.45, impact / 700) * (0.7 + 0.6 * b.c.P.squishy)) / Math.sqrt(b.c.mass);
+      b.s = Math.max(b.c.sClamp[0], Math.min(b.s, -sq));
+      b.sv = -1.5 * sqGain(b);
       b.evx += nx * impact * 0.55;
       b.evy += ny * impact * 0.55;
       b.hv += (rand() - 0.5) * impact / 150;
       lookAt(b, { kind: "blob", blob: other }, 1, 0.8);
-      b.mood -= (impact > 250 ? 0.25 : 0.08) * (1.2 - b.c.P.social);
+      b.mood -= (impact > 250 ? 0.12 : 0.04) * (1.2 - b.c.P.social);
       b.forceRender = true;
       if (b.state === "grabbed" || b.state === "thrown") return;
       if (b.napping) {
@@ -601,20 +613,28 @@ export default function Blobs() {
           const minDist = a.r + c.r + 6 + (a.napping || c.napping ? 24 : 0);
           if (dd >= minDist) continue;
           const nx = dx / dd, ny = dy / dd;
-          const pen = (minDist - dd) / minDist;
-          const f = 2200 * pen * dt;
-          if (!a.grabbed) { a.vx -= nx * f; a.vy -= ny * f; }
-          if (!c.grabbed) { c.vx += nx * f; c.vy += ny * f; }
+          // positional separation, weighted by mass, so nobody slides: they just un-squish apart
           const rv = (c.vx - a.vx) * nx + (c.vy - a.vy) * ny;
+          {
+            const pen = minDist - dd;
+            const ia = a.grabbed ? 0 : 1 / a.c.mass, ic = c.grabbed ? 0 : 1 / c.c.mass;
+            const tot = ia + ic || 1;
+            const k = Math.min(1, 9 * dt);
+            a.x -= nx * pen * (ia / tot) * k; a.y -= ny * pen * (ia / tot) * k;
+            c.x += nx * pen * (ic / tot) * k; c.y += ny * pen * (ic / tot) * k;
+          }
           const key = `p${i}${j}`;
           const cool = pairCool[key] ?? 0;
           if (rv < -40 && t - cool > 0.35) {
             pairCool[key] = t;
-            const e = 0.55;
-            const ma = a.grabbed ? 1e9 : a.d * a.d, mc = c.grabbed ? 1e9 : c.d * c.d;
+            // inelastic: they squish into each other, then the heavy one shoves the light one
+            const e = 0.15;
+            const ma = a.grabbed ? 1e9 : a.c.mass, mc = c.grabbed ? 1e9 : c.c.mass;
             const J = (-(1 + e) * rv) / (1 / ma + 1 / mc);
             a.vx -= (nx * J) / ma; a.vy -= (ny * J) / ma;
             c.vx += (nx * J) / mc; c.vy += (ny * J) / mc;
+            if (!a.grabbed) a.stickUntil = t + 0.22;
+            if (!c.grabbed) c.stickUntil = t + 0.22;
             bump(a, c, nx, ny, -rv);
             bump(c, a, -nx, -ny, -rv);
           }
@@ -690,7 +710,7 @@ export default function Blobs() {
             for (const [name, v] of w) {
               r -= v;
               if (r <= 0) {
-                if (name === "hop") { pickWaypoint(b); const dx = b.tx - b.x, dy = b.ty - b.y; const dd = Math.hypot(dx, dy) || 1; startHop(b, dx / dd, dy / dd, 0.3 + 0.5 * rand()); go(b, "wander"); }
+                if (name === "hop") { pickWaypoint(b); const dx = b.tx - b.x, dy = b.ty - b.y; const dd = Math.hypot(dx, dy) || 1; startHop(b, dx / dd, dy / dd, (0.3 + 0.5 * rand()) * (0.3 + 0.7 * P.jumpy)); go(b, "wander"); }
                 else if (name === "chase") {
                   const target = blobs.find((o) => o !== b && o.state === "wander");
                   if (target) { b.partner = target; b.role = "chaser"; go(b, "chase"); if (rand() < 0.6 * target.c.P.social) { target.partner = b; target.role = "flee"; target.eyeScale = 1.2; target.eyeScaleUntil = t + 3; go(target, "chase"); target.until = b.until; } }
@@ -710,25 +730,24 @@ export default function Blobs() {
             pickWaypoint(b);
           }
           const ux = dx / dd, uy = dy / dd;
-          const am = amble(b);
           if (b.c.gait === "hoppy") {
             if (!b.hop && !b.hopQueue.length && t > b.nextHopAt) {
-              b.nextHopAt = t + 0.55;
+              b.nextHopAt = t + 0.75;
               if (rand() < 0.12) { startHop(b, ux, uy, 0.3); b.hopQueue = [0.35, 0.6]; }
               else startHop(b, ux, uy, 0.25);
             }
           } else if (b.c.gait === "dart") {
             if (!b.dashing) {
-              b.tremble = 1;
+              b.tremble = t > b.nextDash - 0.15 ? 1 : 0; // a shiver of anticipation
               if (t > b.nextDash) {
                 b.dashing = true;
-                b.dashUntil = t + 0.22 + 0.12 * rand();
-                b.dashSp = 650 + 300 * rand();
+                b.dashUntil = t + 0.2 + 0.1 * rand();
+                b.dashSp = 450 + 250 * rand();
                 b.dashX = ux; b.dashY = uy;
                 b.vx = ux * b.dashSp; b.vy = uy * b.dashSp;
                 b.heading = Math.atan2(uy, ux);
                 b.sv += 2.5;
-                b.dt2 = rand() < 0.25 ? 1 : 0;
+                b.dt2 = rand() < 0.15 ? 1 : 0;
                 b.tremble = 0;
                 b.forceRender = true;
               }
@@ -747,17 +766,16 @@ export default function Blobs() {
                 b.dashing = false;
                 b.vx *= 0.05; b.vy *= 0.05;
                 b.sv -= 1.5;
-                b.nextDash = t + 0.4 + 1.1 * rand();
+                b.nextDash = t + 1.2 + 2.5 * rand();
                 b.forceRender = true;
               }
             }
           } else {
-            b.vx += ux * am * dt;
-            b.vy += uy * am * dt;
+            step(b, ux, uy, (70 + 110 * P.speed) * (b.c.gait === "drift" ? 0.5 : 1.2), 0.45 + 0.45 * (1 - P.speed));
           }
           if (!b.hop && b.c.gait !== "hoppy" && b.c.gait !== "dart" && rand() < (0.05 + 0.5 * P.jumpy) * dt) {
             const a = Math.atan2(uy, ux) + (rand() - 0.5) * 1;
-            startHop(b, Math.cos(a), Math.sin(a), 0.3 + 0.5 * rand());
+            startHop(b, Math.cos(a), Math.sin(a), (0.3 + 0.5 * rand()) * (0.3 + 0.7 * P.jumpy));
           }
           if (b.c.name === "Pip" && pointer.known) b.dilate = dist(b, pointer) < 160;
           if (t > b.nextThink) {
@@ -790,7 +808,7 @@ export default function Blobs() {
           lookAt(b, g, 1, 0.5);
           b.heading = lerpAngle(b.heading, Math.atan2(dy, dx), 1 - Math.pow(0.002, dt));
           b.sTarget = 0.12;
-          if (dd > b.r + 120) { b.vx += (dx / dd) * 30 * dt; b.vy += (dy / dd) * 30 * dt; }
+          if (dd > b.r + 120) step(b, dx / dd, dy / dd, 45, 0.8);
           if (g.kind === "pointer") {
             if (pointer.speed > 600 && dd < b.r + 200) { startle(b, pointer.x, pointer.y, 0.9 * P.jumpy); return; }
             if (!pointer.known || dd > 450 || rand() < 0.2 * dt) { b.curiousT = null; go(b, "idle"); return; }
@@ -820,8 +838,7 @@ export default function Blobs() {
             const ax = p.x + p.vx * 0.3, ay = p.y + p.vy * 0.3;
             const dx = ax - b.x, dy = ay - b.y;
             const dd = Math.hypot(dx, dy) || 1;
-            b.vx += (dx / dd) * 160 * (0.6 + P.speed) * dt;
-            b.vy += (dy / dd) * 160 * (0.6 + P.speed) * dt;
+            step(b, dx / dd, dy / dd, 150 * (0.6 + P.speed), 0.3);
             lookAt(b, { kind: "blob", blob: p }, 1, 0.3);
             if (!b.hop && rand() < 0.8 * P.jumpy * dt) startHop(b, dx / dd, dy / dd, 0.5);
             if (dd < b.r + p.r + 10) {
@@ -831,8 +848,10 @@ export default function Blobs() {
             const dx = b.x - p.x, dy = b.y - p.y;
             const dd = Math.hypot(dx, dy) || 1;
             const zig = Math.sin(TAU * 1.5 * b.stateT) * 60;
-            b.vx += ((dx / dd) * 150 * (0.6 + P.speed) + (-dy / dd) * zig) * dt;
-            b.vy += ((dy / dd) * 150 * (0.6 + P.speed) + (dx / dd) * zig) * dt;
+            const fx = (dx / dd) * 150 * (0.6 + P.speed) + (-dy / dd) * zig;
+            const fy = (dy / dd) * 150 * (0.6 + P.speed) + (dx / dd) * zig;
+            const fl = Math.hypot(fx, fy) || 1;
+            step(b, fx / fl, fy / fl, fl, 0.3);
             lookAt(b, { kind: "blob", blob: p }, 0.8, 0.3);
             if (!b.hop && rand() < 0.6 * dt) { const a = Math.atan2(dy, dx) + (rand() - 0.5) * 0.9; startHop(b, Math.cos(a), Math.sin(a), 0.45); }
           }
@@ -848,7 +867,7 @@ export default function Blobs() {
             const gx = p.x + (dx / dd) * (b.r + p.r + 14), gy = p.y + (dy / dd) * (b.r + p.r + 14);
             const ex = gx - b.x, ey = gy - b.y;
             const ed = Math.hypot(ex, ey) || 1;
-            b.vx += (ex / ed) * 120 * dt; b.vy += (ey / ed) * 120 * dt;
+            step(b, ex / ed, ey / ed, 90, 0.35);
             if (ed < 8 || t > b.until) { b.greetPhase = 1; b.until = t + 0.4; }
           } else if (b.greetPhase === 1) {
             b.heading = lerpAngle(b.heading, Math.atan2(p.y - b.y, p.x - b.x), 1 - Math.pow(0.002, dt));
@@ -886,7 +905,7 @@ export default function Blobs() {
           } else {
             const dx = b.sulkX - b.x, dy = b.sulkY - b.y;
             const dd = Math.hypot(dx, dy);
-            if (dd > 20) { b.vx += (dx / dd) * 0.5 * amble(b) * dt; b.vy += (dy / dd) * 0.5 * amble(b) * dt; }
+            if (dd > 20) step(b, dx / dd, dy / dd, 55, 0.6);
             let cx = 0, cy = 0, n = 0;
             for (const o of blobs) if (o !== b) { cx += o.x; cy += o.y; n++; }
             if (n) {
@@ -931,8 +950,8 @@ export default function Blobs() {
           if (!b.dizzy) { b.dizzy = true; b.hv = (rand() < 0.5 ? -1 : 1) * 6; b.evx += 120 * (rand() - 0.5); b.tremble = 1; b.until = t + 0.8; }
           if (t > b.until) {
             b.tremble = 0;
-            b.mood -= 0.5;
-            if (rand() < 0.6 * (1 - P.social)) go(b, "sulk", { grudge: null }); else go(b, "wander");
+            b.mood -= 0.3;
+            if (rand() < 0.4 * (1 - P.social)) go(b, "sulk", { grudge: null }); else go(b, "wander");
           }
           break;
         }
@@ -948,17 +967,17 @@ export default function Blobs() {
         const dx = b.x - pointer.x, dy = b.y - pointer.y;
         const dd = Math.hypot(dx, dy) || 1;
         const reach = r + b.c.flinchReach;
-        if (dd < reach) {
-          const f = ((reach - dd) / reach) * 900 * b.c.flinchForce * (0.5 + P.jumpy) * dt;
-          b.vx += (dx / dd) * f; b.vy += (dy / dd) * f;
-        }
+        if (dd < reach) step(b, dx / dd, dy / dd, ((reach - dd) / reach) * 220 * b.c.flinchForce * (0.5 + P.jumpy), 0.25);
       }
-      // keep off the text
+      // keep off the text: ease the position out, no velocity, so it never slides
       if (inKeep(b.x, b.y, r)) {
         const pl = b.x + r - keep.l, pr = keep.r - (b.x - r), pt = b.y + r - keep.t, pb = keep.b - (b.y - r);
         const m = Math.min(pl, pr, pt, pb);
-        const f = 1400 * dt;
-        if (m === pl) b.vx -= f; else if (m === pr) b.vx += f; else if (m === pt) b.vy -= f; else b.vy += f;
+        const k = Math.min(1, 6 * dt);
+        if (m === pl) { b.x -= pl * k; if (b.vx > 0) b.vx = 0; }
+        else if (m === pr) { b.x += pr * k; if (b.vx < 0) b.vx = 0; }
+        else if (m === pt) { b.y -= pt * k; if (b.vy > 0) b.vy = 0; }
+        else { b.y += pb * k; if (b.vy < 0) b.vy = 0; }
       }
       // edges (the visual box, not the hit radius)
       const hb = b.d / 2;
@@ -969,12 +988,14 @@ export default function Blobs() {
       if (b.y - hb < edge) b.vy += ef * (1 - (b.y - hb) / edge);
       if (H - b.y - hb < edge) b.vy -= ef * (1 - (H - b.y - hb) / edge);
       // friction
-      let fr = 0.3;
-      if (st === "chase") fr = 0.35;
+      let fr = 0.006; // steps stop dead between pushes
+      if (st === "chase") fr = 0.02;
+      else if (st === "greet") fr = 0.02;
       else if (st === "idle" || st === "curious" || st === "sulk" || st === "nap" || st === "startled" || st === "celebrate") fr = 0.08;
       if (b.hop) fr = b.hop.phase === "ant" ? 0.02 : b.hop.phase === "air" ? 0.6 : 0.08;
       if (st === "thrown" && b.hop) fr = 0.6;
       if (b.dashing) fr = 0.95;
+      if (t < b.stickUntil) fr = 0.0005; // squished against something: no sliding
       const k = Math.pow(fr, dt);
       b.vx *= k; b.vy *= k;
       // clamp
@@ -987,14 +1008,20 @@ export default function Blobs() {
       b.x += b.vx * dt;
       b.y += b.vy * dt;
       // walls
-      const bounce = b.c.bounce;
+      const bounce = b.c.bounce * 0.6;
       let impact = 0;
       let wx = b.x, wy = b.y;
       if (b.x < hb) { b.x = hb; impact = Math.abs(b.vx); b.vx = impact * bounce; wx = 0; }
       if (b.x > W - hb) { b.x = W - hb; impact = Math.abs(b.vx); b.vx = -impact * bounce; wx = W; }
       if (b.y < hb) { b.y = hb; impact = Math.abs(b.vy); b.vy = impact * bounce; wy = 0; }
       if (b.y > H - hb) { b.y = H - hb; impact = Math.abs(b.vy); b.vy = -impact * bounce; wy = H; }
-      if (impact > 150) b.sv -= Math.min(3.5, impact / 400) * sqGain(b);
+      if (impact > 150) {
+        const sq = (Math.min(0.45, impact / 900) * (0.7 + 0.6 * P.squishy)) / Math.sqrt(b.c.mass);
+        b.heading = wx === 0 || wx === W ? 0 : Math.PI / 2; // squash against the wall
+        b.s = Math.max(b.c.sClamp[0], Math.min(b.s, -sq));
+        b.sv = -1.5 * sqGain(b);
+        b.stickUntil = t + 0.15;
+      }
       if (impact > 300) { eyeWide(b, 0.25); lookAt(b, { kind: "point", x: wx, y: wy }, 1, 0.5); }
       if (impact > 500) {
         b.hv += (rand() < 0.5 ? -1 : 1) * impact / 60;
@@ -1040,7 +1067,7 @@ export default function Blobs() {
         b.forceRender = true;
       }
       if (b.secondBlinkAt && t > b.secondBlinkAt) { b.secondBlinkAt = 0; b.blinkUntil = t + b.c.blinkDur / 1000; b.forceRender = true; }
-      b.mood += (0 - b.mood) * Math.min(1, (b.state === "sulk" ? 0.3 : 0.15) * dt);
+      b.mood += (0 - b.mood) * Math.min(1, (b.state === "sulk" ? 0.35 : 0.25) * dt);
       if (!b.napping) { b.fatigue = clamp(b.fatigue + (speed * dt) / 20000 - 0.02 * dt, 0, 1); }
       b.shKick *= Math.pow(0.002, dt);
     };
@@ -1138,9 +1165,7 @@ export default function Blobs() {
     let last = performance.now();
     let acc = 0;
     let raf = 0;
-    const loop = (now: number) => {
-      const dt = Math.min(1 / 30, (now - last) / 1000);
-      last = now;
+    const tick = (dt: number) => {
       t += dt;
       if (pointer.expire && t > pointer.expire) { pointer.known = false; pointer.expire = 0; }
       if (!reduced) pairs(dt);
@@ -1171,6 +1196,11 @@ export default function Blobs() {
       }
       acc += dt;
       if (acc >= FRAME) { acc = Math.min(acc - FRAME, FRAME); render(); }
+    };
+    const loop = (now: number) => {
+      const dt = Math.min(1 / 30, (now - last) / 1000);
+      last = now;
+      tick(dt);
       raf = requestAnimationFrame(loop);
     };
     const onVis = () => {
@@ -1179,7 +1209,10 @@ export default function Blobs() {
     };
     document.addEventListener("visibilitychange", onVis);
     if (process.env.NODE_ENV === "development") {
-      (window as unknown as { __blobs: Blob[] }).__blobs = blobs;
+      // dev hooks: inspect the cast and advance the simulation by hand
+      const w = window as unknown as { __blobs: Blob[]; __blobTick: (dt: number, n: number) => void };
+      w.__blobs = blobs;
+      w.__blobTick = (dt, n) => { for (let i = 0; i < n; i++) tick(dt); };
     }
     render();
     raf = requestAnimationFrame(loop);
