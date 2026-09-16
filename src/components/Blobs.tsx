@@ -1252,20 +1252,19 @@ export default function Blobs() {
         b.forceRender = false;
         const c = b.c;
         const half = b.d / 2;
-        // birth: a dot, a fat overshoot, a dip, a settle
+        // birth: a dot, a fat overshoot, a dip, a settle (scaled in place, from the feet up)
         const BORN = [0.2, 0.55, 1.35, 0.8, 1.12, 0.94, 1.03, 1];
         const born = life < 0 ? 0 : life < 0.7 ? BORN[Math.min(BORN.length - 1, Math.floor(life * 12))] : 1;
-        set(b, "born", b.el, "scale", String(born));
         const tr = b.tremble && !reduced ? Math.round((rand() - 0.5) * 2) : 0;
         set(b, "el", b.el, "transform", `translate3d(${Math.round(b.x - half + tr)}px, ${Math.round(b.y - half + tr)}px, 0)`);
 
         const alt = b.alt;
         const P = 1 + 0.06 * alt + 0.18 * alt * b.power;
         const lift = Math.round(alt * (8 + 12 * b.power));
-        set(b, "pop", b.pop, "transform", `translateY(${-lift}px) scale(${q(P * (1 + b.q), 0.02)}, ${q(P * (1 - 0.8 * b.q), 0.02)})`);
+        set(b, "pop", b.pop, "transform", `translateY(${-lift}px) scale(${q(P * born * (1 + b.q), 0.02)}, ${q(P * born * (1 - 0.8 * b.q), 0.02)})`);
 
         const sh = (1 - 0.45 * alt) * (1 + 0.3 * Math.max(0, b.s)) + b.shKick;
-        set(b, "sh", b.shadow, "transform", `scaleX(${q(sh, 0.05)}) scaleY(${q(1 - 0.3 * alt, 0.05)})`);
+        set(b, "sh", b.shadow, "transform", `scaleX(${q(sh * born, 0.05)}) scaleY(${q((1 - 0.3 * alt) * born, 0.05)})`);
         set(b, "sho", b.shadow, "opacity", alt > 0.5 ? "0.3" : "1");
 
         const sx = 1 + b.s, sy = 1 - 0.6 * b.s;
@@ -1397,7 +1396,7 @@ export default function Blobs() {
       for (const b of blobs) {
         // not born yet: sit invisible and inert until it pops in
         if (t < b.bornAt) continue;
-        if (!b.popped) { b.popped = true; showEmote(b, "pop", 0.45); b.qv -= 3 * sqGain(b); b.forceRender = true; }
+        if (!b.popped) { b.popped = true; b.el.style.pointerEvents = ""; showEmote(b, "pop", 0.45); b.qv -= 3 * sqGain(b); b.forceRender = true; }
         if (b.grabbed) {
           const tx = pointer.x - b.gx, ty = pointer.y - b.gy;
           b.vx = (tx - b.x) / dt; b.vy = (ty - b.y) / dt;
@@ -1468,9 +1467,9 @@ export default function Blobs() {
   return (
     <div ref={rootRef} className="blobs" aria-hidden="true">
       {CAST.map((c) => (
-        <div key={c.name} className="blob" data-name={c.name} style={{ scale: "0" }}>
-          <div className="blob-shadow" />
-          <div className="blob-pop">
+        <div key={c.name} className="blob" data-name={c.name} style={{ pointerEvents: "none" }}>
+          <div className="blob-shadow" style={{ transform: "scale(0)" }} />
+          <div className="blob-pop" style={{ transform: "scale(0)" }}>
             <svg className="blob-body" viewBox="0 0 100 100" overflow="visible">
               <g>
                 <path className="ink" />
