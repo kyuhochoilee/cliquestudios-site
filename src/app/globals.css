@@ -401,13 +401,20 @@ body {
   position: absolute;
   top: 0;
   left: 0;
-  width: 45%;
-  height: 45%;
-  color: var(--color-fg);
+  width: 55%;
+  height: 55%;
   opacity: 0;
   transform-origin: center;
   pointer-events: none;
   will-change: transform, opacity;
+}
+.blob-impact .under {
+  color: var(--color-fg); /* black drum, a hair off */
+  transform: translate(-1.3px, 1.1px);
+}
+.blob-impact .ink1 {
+  mix-blend-mode: multiply;
+  transform: translate(1.2px, -0.9px);
 }
 
 /* second ink pass on a mark: multiplies over the first, a hair off */

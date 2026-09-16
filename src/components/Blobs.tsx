@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { CAST, EMOTES, INKS, makeFace, mixInks, roundedPolygon, type Char, type InkPass } from "./cast";
+import { CAST, EMOTES, IMPACTS, INKS, makeFace, mixInks, roundedPolygon, type Char, type InkPass } from "./cast";
 
 /**
  * Five ink creatures on a sheet of paper. Physics and a small state machine
@@ -20,6 +20,15 @@ const EMOTE_INKS: Record<string, InkPass[]> = {
   heart: [{ ink: "pink", a: 1 }],
   dizzy: [{ ink: "blue", a: 1 }, { ink: "pink", a: 0.8 }], // purple
 };
+// ink stacks an impact burst can be printed in
+const IMPACT_INKS: InkPass[][] = [
+  [{ ink: "pink", a: 1 }],
+  [{ ink: "yellow", a: 1 }],
+  [{ ink: "blue", a: 1 }],
+  [{ ink: "yellow", a: 1 }, { ink: "pink", a: 0.85 }],
+  [{ ink: "yellow", a: 1 }, { ink: "blue", a: 0.7 }],
+  [{ ink: "pink", a: 1 }, { ink: "blue", a: 0.75 }],
+];
 const Z_PATHS = [
   "M3.5 4.5 C7 3.5 11 4 15.5 3.5 L4 15.5 C8 15 12 15.5 16.5 15",
   "M3 4 C6.5 4.5 10.5 3 15 4 L4.5 15 C9 16 12.5 14.5 16 15.5",
@@ -84,6 +93,7 @@ type Blob = {
   tapCount: number; lastTap: number;
   emoteKind: string; emoteBorn: number; emoteDur: number; nextEmote: number;
   impact: SVGSVGElement; impactBorn: number; impactX: number; impactY: number; impactAngle: number; impactSize: number;
+  impactUnder: SVGGElement; impactInk0: SVGGElement; impactInk1: SVGGElement;
   ax: number; axUntil: number; anchorX: number; anchorY: number; // squash axis + anchor after a push
   mouth: SVGElement | null;
   d: number;
@@ -248,6 +258,9 @@ export default function Blobs() {
         tapCount: 0, lastTap: -9,
         impactBorn: -99, impactX: 0, impactY: 0, impactAngle: 0, impactSize: 1,
         impact: el.querySelector<SVGSVGElement>(".blob-impact")!,
+        impactUnder: el.querySelector<SVGGElement>(".blob-impact .under")!,
+        impactInk0: el.querySelector<SVGGElement>(".blob-impact .ink0")!,
+        impactInk1: el.querySelector<SVGGElement>(".blob-impact .ink1")!,
         emoteKind: "", emoteBorn: -99, emoteDur: 0, nextEmote: 0,
         ax: 0, axUntil: 0, anchorX: 0, anchorY: 0,
         mouth: face.querySelector<SVGElement>(".mouth"),
@@ -812,8 +825,17 @@ export default function Blobs() {
       b.impactBorn = t;
       b.impactX = b.d / 2 + nx * b.r;
       b.impactY = b.d / 2 + ny * b.r;
-      b.impactAngle = Math.atan2(ny, nx);
-      b.impactSize = clamp(strength / 500, 0.45, 1.5);
+      b.impactAngle = Math.atan2(ny, nx) + (rand() - 0.5) * 1.2; // off the contact angle a bit
+      b.impactSize = clamp(strength / 500, 0.5, 1.6) * (0.8 + rand() * 0.5);
+      // a fresh shape and a fresh ink stack every hit
+      const glyph = IMPACTS[Math.floor(rand() * IMPACTS.length)];
+      const stack = IMPACT_INKS[Math.floor(rand() * IMPACT_INKS.length)];
+      b.impactUnder.innerHTML = glyph;
+      b.impactInk0.innerHTML = glyph;
+      b.impactInk0.style.color = INKS[stack[0].ink];
+      b.impactInk1.innerHTML = stack[1] ? glyph : "";
+      b.impactInk1.style.color = stack[1] ? INKS[stack[1].ink] : "";
+      b.impactInk1.style.opacity = stack[1] ? String(stack[1].a) : "0";
       b.forceRender = true;
     };
     const bump = (b: Blob, other: Blob, nx: number, ny: number, impact: number) => {
@@ -1462,9 +1484,9 @@ export default function Blobs() {
           if (age > 0.4) set(b, "imp", b.impact, "opacity", "0");
           else {
             const f = Math.floor(age * 12);
-            const HIT = [0.5, 1.25, 1.05, 0.8, 0.5];
+            const HIT = [0.5, 1.35, 1.1, 0.85, 0.55];
             const sc = (HIT[Math.min(f, HIT.length - 1)] * b.impactSize).toFixed(2);
-            const w = b.d * 0.45;
+            const w = b.d * 0.55;
             set(b, "imp", b.impact, "opacity", f >= 4 ? "0.5" : "1");
             set(b, "impt", b.impact, "transform", `translate(${Math.round(b.impactX - w / 2)}px, ${Math.round(b.impactY - w / 2)}px) rotate(${(b.impactAngle * 180 / Math.PI).toFixed(0)}deg) scale(${sc})`);
           }
@@ -1579,13 +1601,9 @@ export default function Blobs() {
             <svg className="blob-face" viewBox="0 0 100 100" overflow="visible" />
           </div>
           <svg className="blob-impact" viewBox="0 0 40 40" overflow="visible">
-            <g fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-              <path d="M27 20 L36 20" />
-              <path d="M26 14 L32 8" />
-              <path d="M26 26 L32 32" />
-              <path d="M23 10 L25 4" />
-              <path d="M23 30 L25 36" />
-            </g>
+            <g className="under" />
+            <g className="ink0" />
+            <g className="ink1" />
           </svg>
           <svg className="blob-emote" viewBox="0 0 40 30" overflow="visible">
             <g className="under" />

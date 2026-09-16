@@ -326,6 +326,22 @@ export const EMOTES: Record<string, string> = {
     '<path d="M20 15 m-8 0 a8 8 0 1 1 16 0 a5.5 5.5 0 1 1 -11 0 a3 3 0 1 1 6 0"/><path d="M4 6 L8 10 M8 6 L4 10"/><path d="M32 4 L36 8 M36 4 L32 8"/></g>',
 };
 
+/** Impact bursts. 40 x 40 box centered at (20,20), pointing +x; picked at random per hit. */
+export const IMPACTS: string[] = [
+  // radial ticks
+  '<g fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M27 20 L37 20"/><path d="M26 14 L33 7"/><path d="M26 26 L33 33"/><path d="M22 10 L24 3"/><path d="M22 30 L24 37"/></g>',
+  // spiky star
+  '<path fill="currentColor" d="M20 3 L23.5 14.5 L35 10 L27 19.5 L38 26 L25.5 25 L23 38 L18 26.5 L6 31 L13.5 20.5 L3 13 L16 15.5 Z"/>',
+  // jagged pow cloud
+  '<path fill="currentColor" d="M20 6 L25 13 L33 9 L31 18 L38 22 L30 26 L32 35 L24 30 L20 37 L16 30 L8 35 L10 26 L2 22 L9 18 L7 9 L15 13 Z"/>',
+  // fat dashes fanning out
+  '<g fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"><path d="M24 20 L36 20"/><path d="M23 12 L32 5"/><path d="M23 28 L32 35"/></g>',
+  // shock arcs
+  '<g fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M24 8 Q33 20 24 32"/><path d="M30 4 Q42 20 30 36"/></g>',
+  // sparkle: dots and short strokes
+  '<g fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="34" cy="12" r="3"/><circle cx="35" cy="29" r="2.4"/><circle cx="24" cy="36" r="2"/><path d="M26 20 L33 20" fill="none"/><path d="M23 10 L25 5" fill="none"/></g>',
+];
+
 /** Closed path through `verts` with rounded corners, with an optional per-vertex jitter. */
 export function roundedPolygon(
   verts: [number, number][],
