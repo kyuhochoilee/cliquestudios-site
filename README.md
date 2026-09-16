@@ -8,7 +8,7 @@ Fraunces (wordmark) and Figtree (body) are self-hosted through `next/font/google
 
 ## The characters
 
-Five ink creatures wander the page (`src/components/Blobs.tsx`). Their shapes, faces, colors, and personalities live in `src/components/cast.ts`; the physics and state machine (wander, hop, nap, greet, chase, startle, sulk, celebrate, grab and throw) live in the component. The DOM is written 12 times a second for a stop-motion feel. The risograph look comes from `src/components/RisoDefs.tsx` (SVG filters) and the tokens at the top of `src/app/globals.css`.
+Five ink creatures wander the page (`src/components/Blobs.tsx`). Their shapes, faces, colors, and personalities live in `src/components/cast.ts`; the physics and state machine (wander, hop, nap, greet, chase, startle, sulk, celebrate, grab and throw) live in the component. The DOM is written 24 times a second, with the outline boil re-rolled at 12, for a stop-motion feel. The risograph look comes from `src/components/RisoDefs.tsx` (SVG filters) and the tokens at the top of `src/app/globals.css`.
 
 ## Development and deployment
 

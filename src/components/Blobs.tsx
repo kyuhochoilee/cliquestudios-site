@@ -9,7 +9,7 @@ import { CAST, roundedPolygon, type Char } from "./cast";
  * like stop motion. See cast.ts for who they are.
  */
 
-const FPS = 12;
+const FPS = 24; // motion at 24, the outline boil still re-rolls at 12
 const FRAME = 1 / FPS;
 const TAU = Math.PI * 2;
 
@@ -43,7 +43,8 @@ type Blob = {
   face: SVGSVGElement;
   eyesG: SVGGElement | null;
   pupilsG: SVGGElement | null;
-  wink: SVGElement | null;
+  wink: SVGElement[];
+  ax: number; axUntil: number; anchorX: number; anchorY: number; // squash axis + anchor after a push
   mouth: SVGElement | null;
   d: number;
   r: number;
@@ -181,7 +182,8 @@ export default function Blobs() {
         pop: el.querySelector<HTMLDivElement>(".blob-pop")!,
         eyesG: face.querySelector<SVGGElement>(".eyes"),
         pupilsG: face.querySelector<SVGGElement>(".pupils"),
-        wink: face.querySelector<SVGElement>(".wink"),
+        wink: Array.from(face.querySelectorAll<SVGElement>(".wink")),
+        ax: 0, axUntil: 0, anchorX: 0, anchorY: 0,
         mouth: face.querySelector<SVGElement>(".mouth"),
         d, r, scale,
         x: spot.x, y: spot.y, vx: 0, vy: 0,
@@ -279,8 +281,8 @@ export default function Blobs() {
       if (t < b.stepAt) return;
       b.stepAt = t + interval;
       const m = Math.pow(b.c.mass, 0.35); // heavy ones lumber
-      b.vx += (ux * strength * 1.35) / m;
-      b.vy += (uy * strength * 1.35) / m;
+      b.vx += (ux * strength * 1.5) / m;
+      b.vy += (uy * strength * 1.5) / m;
       b.qv -= 1.4 * sqGain(b);
       b.forceRender = true;
     };
@@ -348,7 +350,7 @@ export default function Blobs() {
     const startHop = (b: Blob, dx: number, dy: number, power: number, opts: { ant?: number; ground?: boolean } = {}) => {
       if (b.hop && b.hop.phase !== "rec") return false;
       const ant = opts.ant ?? 2;
-      b.hop = { phase: ant > 0 ? "ant" : "air", f: 0, frames: ant > 0 ? ant : Math.round(3 + 4 * power), dx, dy, power, ground: !!opts.ground };
+      b.hop = { phase: ant > 0 ? "ant" : "air", f: 0, frames: ant > 0 ? ant : Math.round(4 + 7 * power), dx, dy, power, ground: !!opts.ground };
       if (ant > 0) {
         b.qv += 3 * sqGain(b);
         if (dx || dy) { b.heading = Math.atan2(dy, dx); lookAt(b, { kind: "point", x: b.x + dx * 120, y: b.y + dy * 120 }, 1, 0.5); }
@@ -367,7 +369,7 @@ export default function Blobs() {
       b.sv += 1.5 * sqGain(b);
       h.phase = "air";
       h.f = 0;
-      h.frames = Math.round(3 + 4 * h.power);
+      h.frames = Math.round(4 + 7 * h.power);
       b.power = h.power;
     };
     const onLand = (b: Blob) => {
@@ -401,7 +403,7 @@ export default function Blobs() {
       } else if (h.phase === "air") {
         b.alt = h.ground ? 0 : Math.sin((Math.PI * (h.f - 0.5)) / h.frames);
         if (b.mouth && h.f === Math.round(h.frames / 2)) b.grinUntil = t + 0.25;
-        if (h.f >= h.frames) { onLand(b); h.phase = "land"; h.f = 0; h.frames = 2; }
+        if (h.f >= h.frames) { onLand(b); h.phase = "land"; h.f = 0; h.frames = 3; }
       } else if (h.phase === "land") {
         if (h.f >= h.frames) { h.phase = "rec"; h.f = 0; h.frames = 2; }
       } else if (h.f >= h.frames) {
@@ -576,8 +578,12 @@ export default function Blobs() {
       go(b, "startled", { src: { x: sx, y: sy }, power });
     };
     const bump = (b: Blob, other: Blob, nx: number, ny: number, impact: number) => {
-      b.heading = Math.atan2(ny, nx);
-      // squash along the contact normal; the light one takes most of the deformation
+      // squash along the contact normal, anchored on the far side so the pushed side caves in
+      b.ax = Math.atan2(ny, nx);
+      b.axUntil = t + 0.45;
+      b.anchorX = -nx * b.r * 0.9;
+      b.anchorY = -ny * b.r * 0.9;
+      // the light one takes most of the deformation
       const sq = (Math.min(0.45, impact / 700) * (0.7 + 0.6 * b.c.P.squishy)) / Math.sqrt(b.c.mass);
       b.s = Math.max(b.c.sClamp[0], Math.min(b.s, -sq));
       b.sv = -1.5 * sqGain(b);
@@ -633,8 +639,8 @@ export default function Blobs() {
             const J = (-(1 + e) * rv) / (1 / ma + 1 / mc);
             a.vx -= (nx * J) / ma; a.vy -= (ny * J) / ma;
             c.vx += (nx * J) / mc; c.vy += (ny * J) / mc;
-            if (!a.grabbed) a.stickUntil = t + 0.22;
-            if (!c.grabbed) c.stickUntil = t + 0.22;
+            if (!a.grabbed) a.stickUntil = t + 0.16;
+            if (!c.grabbed) c.stickUntil = t + 0.16;
             bump(a, c, nx, ny, -rv);
             bump(c, a, -nx, -ny, -rv);
           }
@@ -771,7 +777,7 @@ export default function Blobs() {
               }
             }
           } else {
-            step(b, ux, uy, (70 + 110 * P.speed) * (b.c.gait === "drift" ? 0.5 : 1.2), 0.45 + 0.45 * (1 - P.speed));
+            step(b, ux, uy, (70 + 110 * P.speed) * (b.c.gait === "drift" ? 0.5 : 1.2), 0.32 + 0.38 * (1 - P.speed));
           }
           if (!b.hop && b.c.gait !== "hoppy" && b.c.gait !== "dart" && rand() < (0.05 + 0.5 * P.jumpy) * dt) {
             const a = Math.atan2(uy, ux) + (rand() - 0.5) * 1;
@@ -1017,7 +1023,12 @@ export default function Blobs() {
       if (b.y > H - hb) { b.y = H - hb; impact = Math.abs(b.vy); b.vy = -impact * bounce; wy = H; }
       if (impact > 150) {
         const sq = (Math.min(0.45, impact / 900) * (0.7 + 0.6 * P.squishy)) / Math.sqrt(b.c.mass);
-        b.heading = wx === 0 || wx === W ? 0 : Math.PI / 2; // squash against the wall
+        // squash against the wall, anchored on the side away from it
+        const wnx = wx === 0 ? -1 : wx === W ? 1 : 0, wny = wy === 0 ? -1 : wy === H ? 1 : 0;
+        b.ax = Math.atan2(wny, wnx);
+        b.axUntil = t + 0.4;
+        b.anchorX = -wnx * b.r * 0.9;
+        b.anchorY = -wny * b.r * 0.9;
         b.s = Math.max(b.c.sClamp[0], Math.min(b.s, -sq));
         b.sv = -1.5 * sqGain(b);
         b.stickUntil = t + 0.15;
@@ -1036,7 +1047,7 @@ export default function Blobs() {
       b.sv += (k * (target - b.s) - c * b.sv) * dt;
       b.s += b.sv * dt;
       b.s = clamp(b.s, b.c.sClamp[0], b.c.sClamp[1]);
-      b.qv += (150 * (b.qTarget - b.q) - c * b.qv) * dt;
+      b.qv += (260 * (b.qTarget - b.q) - c * b.qv) * dt;
       b.q += b.qv * dt;
       b.q = clamp(b.q, -0.35, 0.45);
       if (speed > 15 && !b.grabbed) {
@@ -1045,6 +1056,8 @@ export default function Blobs() {
       }
       b.heading += b.hv * dt;
       b.hv *= Math.pow(0.02, dt);
+      // the squash axis follows the heading unless a push is holding it
+      if (t > b.axUntil) { b.ax = b.heading; b.anchorX = 0; b.anchorY = 0; }
       // lean for upright bodies
       if (b.c.nose === null) {
         const targetTilt = clamp(b.vx / (vmax(b) * 2), -1, 1) * b.c.lean;
@@ -1101,20 +1114,18 @@ export default function Blobs() {
 
         const sx = 1 + b.s, sy = 1 - 0.6 * b.s;
         const h = q5deg(b.heading);
-        let bodyT: string;
-        let faceRot: number;
-        if (c.nose !== null) {
-          bodyT = `rotate(${h.toFixed(3)}rad) scale(${q(sx, 0.04)}, ${q(sy, 0.04)}) rotate(${(-c.nose).toFixed(3)}rad)`;
-          faceRot = h - c.nose;
-        } else {
-          const tilt = q5deg(b.tilt);
-          bodyT = `rotate(${h.toFixed(3)}rad) scale(${q(sx, 0.04)}, ${q(sy, 0.04)}) rotate(${(-h).toFixed(3)}rad) rotate(${tilt.toFixed(3)}rad)`;
-          faceRot = tilt;
-        }
+        const ax = q5deg(b.ax);
+        const rot = c.nose !== null ? h - c.nose : q5deg(b.tilt);
+        const faceRot = rot;
+        // stretch/squash along `ax`; after a push it is anchored on the far side so the pushed side caves in
+        const squash = `rotate(${ax.toFixed(3)}rad) scale(${q(sx, 0.04)}, ${q(sy, 0.04)}) rotate(${(-ax).toFixed(3)}rad)`;
+        const bodyT = b.anchorX || b.anchorY
+          ? `translate(${b.anchorX.toFixed(1)}px, ${b.anchorY.toFixed(1)}px) ${squash} translate(${(-b.anchorX).toFixed(1)}px, ${(-b.anchorY).toFixed(1)}px) rotate(${rot.toFixed(3)}rad)`
+          : `${squash} rotate(${rot.toFixed(3)}rad)`;
         set(b, "body", b.body, "transform", bodyT);
 
         // outline boil
-        if (!reduced || !b.last.d) {
+        if ((!reduced && frame % 2 === 0) || !b.last.d) {
           const jitter = reduced ? 0 : c.boil * b.boilMul;
           const d = roundedPolygon(c.verts, c.radius, jitter, rand);
           if (b.last.d !== d) { b.last.d = d; for (const p of b.paths) p.setAttribute("d", d); }
@@ -1122,7 +1133,7 @@ export default function Blobs() {
 
         // eyes: lag + gaze
         let ox = b.ex - b.x, oy = b.ey - b.y;
-        const maxLag = b.d * 0.16;
+        const maxLag = b.d * 0.12;
         const lag = Math.hypot(ox, oy);
         if (lag > maxLag) { ox *= maxLag / lag; oy *= maxLag / lag; }
         let gx = 0, gy = 0;
@@ -1156,7 +1167,7 @@ export default function Blobs() {
         set(b, "cheeks", b.cheeks, "transform", happy ? "scale(1.35)" : "none");
         const es = b.eyeScale;
         set(b, "eyes", b.eyesG, "transform", `scale(${q(es, 0.05)}, ${q(es * lid, 0.05)})`);
-        set(b, "wink", b.wink, "transform", blinking && b.winking ? "scaleY(0.12)" : "none");
+        b.wink.forEach((w, k) => set(b, `wink${k}`, w, "transform", blinking && b.winking ? "scaleY(0.12)" : "none"));
         set(b, "mouth", b.mouth, "transform", t < b.grinUntil ? "scaleX(1.2)" : "none");
       }
     };

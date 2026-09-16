@@ -77,7 +77,7 @@ export const CAST: Char[] = [
     hold: 1,
     bounce: 0.5,
     sClamp: [-0.5, 0.7],
-    spring: [220, 14],
+    spring: [380, 22],
     headingRate: 1,
     mass: 0.6,
     flinchReach: 140,
@@ -86,7 +86,7 @@ export const CAST: Char[] = [
     gazeHeading: false,
     gazeOn: "face",
     pupilRange: 0,
-    eyeSpring: [400, 12],
+    eyeSpring: [520, 18],
     blink: [900, 2200],
     blinkDur: 80,
     doubleP: 0.3,
@@ -119,7 +119,7 @@ export const CAST: Char[] = [
     hold: 2,
     bounce: 0.4,
     sClamp: [-0.45, 0.5],
-    spring: [90, 6],
+    spring: [140, 9],
     headingRate: 1,
     mass: 3.2,
     flinchReach: 30,
@@ -128,7 +128,7 @@ export const CAST: Char[] = [
     gazeHeading: false,
     gazeOn: "pupils",
     pupilRange: 2.5,
-    eyeSpring: [140, 14],
+    eyeSpring: [200, 16],
     blink: [5000, 9000],
     blinkDur: 450,
     doubleP: 0,
@@ -161,7 +161,7 @@ export const CAST: Char[] = [
     hold: 1,
     bounce: 0.7,
     sClamp: [-0.4, 0.6],
-    spring: [150, 9],
+    spring: [260, 16],
     headingRate: 1,
     mass: 1,
     flinchReach: 0,
@@ -170,7 +170,7 @@ export const CAST: Char[] = [
     gazeHeading: false,
     gazeOn: "pupils",
     pupilRange: 5,
-    eyeSpring: [260, 16],
+    eyeSpring: [380, 20],
     blink: [2500, 4000],
     blinkDur: 120,
     doubleP: 0.2,
@@ -202,16 +202,16 @@ export const CAST: Char[] = [
     hold: 1,
     bounce: 0.6,
     sClamp: [-0.4, 0.5],
-    spring: [120, 8],
+    spring: [220, 14],
     headingRate: 1,
     mass: 1.7,
     flinchReach: 60,
     flinchForce: 0.4,
     gaze: 0.9,
     gazeHeading: false,
-    gazeOn: "face",
-    pupilRange: 0,
-    eyeSpring: [220, 14],
+    gazeOn: "pupils",
+    pupilRange: 4,
+    eyeSpring: [340, 18],
     blink: [2000, 3800],
     blinkDur: 130,
     doubleP: 0.15,
@@ -220,9 +220,10 @@ export const CAST: Char[] = [
     napProne: 0.15,
     shy: true,
     face:
-      '<g class="cheeks" fill="#ff48b0" opacity="0.8"><ellipse cx="30" cy="57" rx="6.5" ry="3.8"/><ellipse cx="70" cy="57" rx="6.5" ry="3.8"/></g>' +
-      '<g class="eyes"><g class="pupils"><circle cx="40" cy="47" r="5"/><circle cx="60" cy="47" r="5"/></g></g>' +
-      '<path class="mouth" d="M44 59 Q47 63 50 59 Q53 63 56 59" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>',
+      '<g class="cheeks" fill="#ff48b0" opacity="0.8"><ellipse cx="26" cy="59" rx="6.5" ry="3.8"/><ellipse cx="74" cy="59" rx="6.5" ry="3.8"/></g>' +
+      '<g class="eyes"><circle cx="38" cy="46" r="11" fill="#fff"/><circle cx="62" cy="46" r="11" fill="#fff"/>' +
+      '<g class="pupils"><circle cx="40" cy="47" r="6"/><circle cx="60" cy="47" r="6"/><circle cx="42" cy="44.5" r="1.8" fill="#fff"/><circle cx="62" cy="44.5" r="1.8" fill="#fff"/></g></g>' +
+      '<path class="mouth" d="M45 62 Q47.5 65.5 50 62 Q52.5 65.5 55 62" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>',
   },
   {
     // A jolly jumping bean that treats the page as a trampoline.
@@ -244,16 +245,16 @@ export const CAST: Char[] = [
     hold: 1,
     bounce: 0.95,
     sClamp: [-0.7, 0.7],
-    spring: [150, 7],
+    spring: [260, 13],
     headingRate: 1,
     mass: 0.7,
     flinchReach: 40,
     flinchForce: 0.6,
     gaze: 0.4,
     gazeHeading: true,
-    gazeOn: "face",
-    pupilRange: 0,
-    eyeSpring: [200, 10],
+    gazeOn: "pupils",
+    pupilRange: 4,
+    eyeSpring: [300, 15],
     blink: [1800, 3500],
     blinkDur: 100,
     doubleP: 0,
@@ -262,8 +263,8 @@ export const CAST: Char[] = [
     napProne: 0.05,
     shy: false,
     face:
-      '<g class="eyes"><g class="pupils"><circle cx="40" cy="46" r="8.5"/><circle class="wink" cx="61" cy="42" r="5.5"/></g></g>' +
-      '<g class="brows" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M31 32 Q40 25 49 32"/><path d="M55 29 Q61 24 67 29"/></g>' +
+      '<g class="eyes"><circle cx="39" cy="44" r="12" fill="#fff"/><circle class="wink" cx="62" cy="41" r="9" fill="#fff"/>' +
+      '<g class="pupils"><circle cx="41" cy="45" r="6.5"/><circle class="wink" cx="63" cy="42" r="5"/><circle cx="43" cy="42.5" r="2" fill="#fff"/><circle class="wink" cx="64.5" cy="40" r="1.5" fill="#fff"/></g></g>' +
       '<path class="mouth" d="M43 60 Q51 72 59 60 Z"/>',
   },
 ];
