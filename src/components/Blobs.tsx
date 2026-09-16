@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { CAST, EMOTES, IMPACTS, INKS, MOUTHS, makeFace, mixInks, roundedPolygon, type Char, type InkPass } from "./cast";
+import { CAST, EMOTES, IMPACTS, INKS, MOUTHS, makeFace, mixInks, roughOutline, type Char, type Edge, type InkPass } from "./cast";
 
 /**
  * Five ink creatures on a sheet of paper. Physics and a small state machine
@@ -169,6 +169,7 @@ type Blob = {
   grabbed: boolean; gx: number; gy: number; hist: { x: number; y: number; t: number }[];
   forceRender: boolean;
   last: Record<string, string>;
+  edge: Edge;
 };
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -274,8 +275,8 @@ export default function Blobs() {
         paths[1].remove();
         paths.length = 1;
       }
-      const g = body.querySelector("g");
-      if (g) g.setAttribute("filter", d < 65 ? "url(#riso-edge-sm)" : "url(#riso-edge)");
+      // the rough edge is drawn into the outline itself (see roughOutline), in page pixels
+      const edge: Edge = { fat: 0.4 / scale, amp: (d < 65 ? 0.9 : 1.3) / scale, step: 2.5, phases: [rand(), rand(), rand(), rand()].map((v) => v * TAU) };
       face.innerHTML = makeFace(c, c.name.toLowerCase());
       const r = (d * c.fill) / 2;
       const spot = openSpot(r);
@@ -334,6 +335,7 @@ export default function Blobs() {
         grabbed: false, gx: 0, gy: 0, hist: [],
         forceRender: true,
         last: {},
+        edge,
       };
       blobs.push(b);
       b.pop.style.transformOrigin = `50% ${c.bottom}%`;
@@ -1455,7 +1457,7 @@ export default function Blobs() {
         // outline boil
         if ((!reduced && frame % 2 === 0) || !b.last.d) {
           const jitter = reduced ? 0 : c.boil * b.boilMul;
-          const d = roundedPolygon(c.verts, c.radius, jitter, rand);
+          const d = roughOutline(c.verts, c.radius, jitter, rand, b.edge);
           if (b.last.d !== d) { b.last.d = d; for (const p of b.paths) p.setAttribute("d", d); }
         }
 
@@ -1660,6 +1662,39 @@ export default function Blobs() {
       w.__blobTick = (dt, n) => { for (let i = 0; i < n; i++) tick(dt); };
       w.__blobGo = (i, s, opts) => go(blobs[i], s, opts);
       (w as unknown as { __blobExpr: (i: number, name: string, dur: number) => void }).__blobExpr = (i, name, dur) => setExpr(blobs[i], name, dur);
+      // #perf[,nofilter,noblend,nomask,notooth,nowc]: frame-time HUD for devices without devtools (the iOS simulator)
+      const flags = location.hash.slice(1).split(",");
+      if (flags[0] === "perf") {
+        const OFF: Record<string, string> = {
+          nofilter: ".blob * { filter: none !important }",
+          noblend: ".blob, .blob * { mix-blend-mode: normal !important }",
+          nomask: ".blob * { -webkit-mask-image: none !important; mask-image: none !important }",
+          notooth: "body { background-image: none !important }",
+          nowc: ".blob { will-change: auto !important }",
+          nostatic: ".wordmark-print, .wordmark, .wordmark *, .note, .note::before, .note::after, .tape { filter: none !important }",
+        };
+        const st = document.createElement("style");
+        st.textContent = flags.slice(1).map((k) => OFF[k] ?? "").join("\n");
+        document.head.appendChild(st);
+        const hud = document.createElement("pre");
+        hud.style.cssText = "position:fixed;left:8px;top:8px;z-index:99;background:#fff;color:#000;font:15px/1.35 monospace;padding:8px;margin:0;pointer-events:none";
+        document.body.appendChild(hud);
+        const gaps: number[] = [];
+        let lastT = performance.now();
+        const t0 = lastT;
+        const DUR = 10000;
+        const sample = () => {
+          const n = performance.now();
+          gaps.push(n - lastT);
+          lastT = n;
+          if (n - t0 < DUR) { hud.textContent = `${flags.join(",")}\nmeasuring ${((n - t0) / 1000).toFixed(0)}s`; requestAnimationFrame(sample); return; }
+          gaps.shift();
+          gaps.sort((a, b) => a - b);
+          const q = (p: number) => gaps[Math.floor(p * (gaps.length - 1))].toFixed(1);
+          hud.textContent = `${flags.join(",")}\nframes ${gaps.length}\nfps ${(gaps.length / (DUR / 1000)).toFixed(1)}\np50 ${q(0.5)}\np90 ${q(0.9)}\np99 ${q(0.99)}\nmax ${q(1)}\n>20ms ${gaps.filter((g) => g > 20).length}\n>34ms ${gaps.filter((g) => g > 34).length}\ndpr ${devicePixelRatio} ${innerWidth}x${innerHeight}`;
+        };
+        setTimeout(() => requestAnimationFrame(sample), 5000);
+      }
     }
     render();
     raf = requestAnimationFrame(loop);

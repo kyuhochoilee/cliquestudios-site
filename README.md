@@ -4,7 +4,7 @@ Corporate website for Clique Studios LLC, served at https://cliquestudios.org by
 
 ## Typefaces
 
-Fraunces (wordmark) and Figtree (body) are self-hosted through `next/font/google`; no requests go to Google at runtime.
+Figtree (body) is self-hosted through `next/font/google`. Fraunces sets only the wordmark, so `src/app/fonts/fraunces-wordmark.woff2` is a 4 KB glyph subset of the variable font (with its optical-size axis) loaded through `next/font/local`; regenerate it from the Google Fonts CSS API with `text=Clique%20Studios` if the wordmark's letters ever change. No requests go to Google at runtime.
 
 ## Inks
 
@@ -12,7 +12,15 @@ The whole page is printed with four drums: Fluorescent Pink `#ff48b0`, Blue `#00
 
 ## The characters
 
-Five ink creatures wander the page (`src/components/Blobs.tsx`). Their shapes, faces, colors, and personalities live in `src/components/cast.ts`; the physics and state machine (wander, hop, nap, greet, chase, startle, sulk, celebrate, grab and throw) live in the component. The DOM is written 24 times a second, with the outline boil re-rolled at 12, for a stop-motion feel. The risograph look comes from `src/components/RisoDefs.tsx` (SVG filters) and the tokens at the top of `src/app/globals.css`.
+Five ink creatures wander the page (`src/components/Blobs.tsx`). Their shapes, faces, colors, and personalities live in `src/components/cast.ts`; the physics and state machine (wander, hop, nap, greet, chase, startle, sulk, celebrate, grab and throw) live in the component. The DOM is written 24 times a second, with the outline boil re-rolled at 12, for a stop-motion feel. The risograph look comes from the tokens at the top of `src/app/globals.css` (paper tooth, ink speckle masks, misregistration) and the SVG filters in `src/components/RisoDefs.tsx`, which are used only on things that do not move (the note, the tape, the wordmark). The characters' rough edges are drawn into the outline geometry itself (`roughOutline` in `cast.ts`): WebKit re-runs SVG filters on the CPU every time a filtered element changes, and that alone cost half the frames on an iPhone.
+
+## Performance
+
+The animation is DOM and SVG only. Physics runs each frame; DOM writes happen 24 times a second through a dirty-checking `set()`, and the loop stops while the tab is hidden. Measured on the iPhone simulator at 3x: 60 fps with a 99th-percentile frame of 20 ms (it was 28 fps with 26% of frames over 20 ms before the edge filter moved into geometry). On a throttled 4G / 4x-CPU Chrome profile the page transfers about 190 KB and paints in about 0.6 s.
+
+In development, `/#perf` shows a frame-time readout after five seconds; add flags to switch effects off for A/B runs: `/#perf,nofilter,noblend,nomask,notooth,nowc,nostatic`.
+
+`public/_headers` gives the hashed build output under `/_next/static/` a one-year immutable cache.
 
 ## Development and deployment
 

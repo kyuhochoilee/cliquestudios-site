@@ -425,3 +425,84 @@ export function roundedPolygon(
   }
   return d + "Z";
 }
+
+/** A fixed set of phases for one body's edge noise, rolled once at birth. */
+export type Edge = { fat: number; amp: number; step: number; phases: number[] };
+const EDGE_F = [5, 9, 17, 31];
+const EDGE_W = [0.42, 0.3, 0.18, 0.1];
+
+/**
+ * The same rounded polygon with the risograph edge baked into the geometry:
+ * the curve is sampled every `step` units and pushed along its normal by a
+ * hair of fattening plus a little noise that is fixed around the outline.
+ * This replaces the feDisplacementMap filter on the bodies, which WebKit
+ * re-runs on the CPU every time a body changes (every frame, here).
+ */
+export function roughOutline(
+  verts: [number, number][],
+  radius: number,
+  jitter: number,
+  rnd: () => number,
+  edge: Edge,
+): string {
+  const n = verts.length;
+  const pts = verts.map(([x, y]) =>
+    jitter ? [x + (rnd() - 0.5) * 2 * jitter, y + (rnd() - 0.5) * 2 * jitter] : [x, y],
+  );
+  // corner geometry: each corner is a straight run into a quadratic turn
+  const corners: { sx: number; sy: number; px: number; py: number; ex: number; ey: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = pts[(i + n - 1) % n];
+    const p1 = pts[i];
+    const p2 = pts[(i + 1) % n];
+    const ax = p0[0] - p1[0];
+    const ay = p0[1] - p1[1];
+    const bx = p2[0] - p1[0];
+    const by = p2[1] - p1[1];
+    const al = Math.hypot(ax, ay) || 1;
+    const bl = Math.hypot(bx, by) || 1;
+    const r = Math.min(radius, al / 2, bl / 2);
+    corners.push({
+      sx: p1[0] + (ax / al) * r, sy: p1[1] + (ay / al) * r,
+      px: p1[0], py: p1[1],
+      ex: p1[0] + (bx / bl) * r, ey: p1[1] + (by / bl) * r,
+    });
+  }
+  // sample the outline at a steady spacing
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const c = corners[i];
+    const prev = corners[(i + n - 1) % n];
+    const lx = c.sx - prev.ex, ly = c.sy - prev.ey;
+    const ll = Math.hypot(lx, ly);
+    const lk = Math.max(1, Math.round(ll / edge.step));
+    for (let k = 0; k < lk; k++) { const t = k / lk; xs.push(prev.ex + lx * t); ys.push(prev.ey + ly * t); }
+    const ql = Math.hypot(c.px - c.sx, c.py - c.sy) + Math.hypot(c.ex - c.px, c.ey - c.py);
+    const qk = Math.max(2, Math.round(ql / edge.step));
+    for (let k = 0; k < qk; k++) {
+      const t = k / qk, u = 1 - t;
+      xs.push(u * u * c.sx + 2 * u * t * c.px + t * t * c.ex);
+      ys.push(u * u * c.sy + 2 * u * t * c.py + t * t * c.ey);
+    }
+  }
+  const m = xs.length;
+  let cx = 0, cy = 0;
+  for (let i = 0; i < m; i++) { cx += xs[i]; cy += ys[i]; }
+  cx /= m; cy /= m;
+  let d = "";
+  for (let i = 0; i < m; i++) {
+    // outward normal from the neighbours
+    const tx = xs[(i + 1) % m] - xs[(i + m - 1) % m];
+    const ty = ys[(i + 1) % m] - ys[(i + m - 1) % m];
+    const tl = Math.hypot(tx, ty) || 1;
+    let nx = ty / tl, ny = -tx / tl;
+    if (nx * (xs[i] - cx) + ny * (ys[i] - cy) < 0) { nx = -nx; ny = -ny; }
+    const u = i / m;
+    let noise = 0;
+    for (let k = 0; k < EDGE_F.length; k++) noise += EDGE_W[k] * Math.sin(2 * Math.PI * EDGE_F[k] * u + edge.phases[k]);
+    const push = edge.fat + edge.amp * noise;
+    d += (i === 0 ? "M" : "L") + (xs[i] + nx * push).toFixed(1) + " " + (ys[i] + ny * push).toFixed(1);
+  }
+  return d + "Z";
+}
