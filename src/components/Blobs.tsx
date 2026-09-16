@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { CAST, EMOTES, IMPACTS, INKS, makeFace, mixInks, roundedPolygon, type Char, type InkPass } from "./cast";
+import { CAST, EMOTES, IMPACTS, INKS, MOUTHS, makeFace, mixInks, roundedPolygon, type Char, type InkPass } from "./cast";
 
 /**
  * Five ink creatures on a sheet of paper. Physics and a small state machine
@@ -19,7 +19,48 @@ const EMOTE_INKS: Record<string, InkPass[]> = {
   q: [{ ink: "blue", a: 1 }],
   heart: [{ ink: "pink", a: 1 }],
   dizzy: [{ ink: "blue", a: 1 }, { ink: "pink", a: 0.8 }], // purple
+  sweat: [{ ink: "blue", a: 1 }],
+  sweats: [{ ink: "blue", a: 1 }],
+  notes: [{ ink: "blue", a: 1 }, { ink: "pink", a: 0.8 }],
+  sparkle: [{ ink: "yellow", a: 1 }],
+  dots: [{ ink: "blue", a: 1 }],
+  bang2: [{ ink: "pink", a: 1 }, { ink: "yellow", a: 0.55 }],
+  wow: [{ ink: "blue", a: 1 }, { ink: "pink", a: 0.8 }],
+  cloud: [{ ink: "blue", a: 1 }],
+  hearts: [{ ink: "pink", a: 1 }],
+  star: [{ ink: "yellow", a: 1 }, { ink: "pink", a: 0.85 }],
+  zap: [{ ink: "yellow", a: 1 }],
 };
+// Expressions: one row drives lids, lower lids, brows, pupils, mouth and cheeks together.
+type Expr = { lid: number; lo: number; brows: "" | "angry" | "sad" | "up" | "quiz" | "flat"; mouth: keyof typeof MOUTHS; cheeks?: boolean; eye?: number; pupil?: number; look?: "" | "away" | "up" | "down" | "cross" };
+const EXPR: Record<string, Expr> = {
+  neutral: { lid: 0, lo: 0, brows: "", mouth: "small" },
+  happy: { lid: 0, lo: 0.5, brows: "", mouth: "smile", cheeks: true },
+  laugh: { lid: 0, lo: 0.6, brows: "up", mouth: "grin", cheeks: true },
+  excited: { lid: 0, lo: 0, brows: "up", mouth: "grin", eye: 1.15, pupil: 1.2 },
+  love: { lid: 0, lo: 0.55, brows: "up", mouth: "smile", cheeks: true, pupil: 1.3 },
+  shy: { lid: 0.15, lo: 0.5, brows: "", mouth: "small", cheeks: true, look: "away" },
+  proud: { lid: 0.25, lo: 0, brows: "up", mouth: "smile" },
+  smug: { lid: 0.4, lo: 0, brows: "quiz", mouth: "smirk", pupil: 0.9 },
+  mischievous: { lid: 0.35, lo: 0, brows: "angry", mouth: "smirk" },
+  surprised: { lid: 0, lo: 0, brows: "up", mouth: "o", eye: 1.3, pupil: 0.8 },
+  scared: { lid: 0, lo: 0, brows: "sad", mouth: "wavy", eye: 1.25, pupil: 0.55 },
+  held: { lid: 0, lo: 0, brows: "up", mouth: "wavy", eye: 1.2, look: "down" },
+  hurt: { lid: 0.75, lo: 0.4, brows: "sad", mouth: "w" },
+  angry: { lid: 0.5, lo: 0, brows: "angry", mouth: "frown" },
+  sad: { lid: 0.35, lo: 0, brows: "sad", mouth: "frown", look: "down" },
+  bored: { lid: 0.45, lo: 0, brows: "flat", mouth: "flat", look: "away" },
+  sleepy: { lid: 0.75, lo: 0, brows: "", mouth: "small" },
+  yawn: { lid: 0.7, lo: 0.3, brows: "up", mouth: "yawn" },
+  curious: { lid: 0, lo: 0, brows: "quiz", mouth: "o", eye: 1.1 },
+  confused: { lid: 0.15, lo: 0, brows: "quiz", mouth: "wavy", look: "up" },
+  think: { lid: 0.2, lo: 0, brows: "quiz", mouth: "flat", look: "up" },
+  dizzy: { lid: 0.2, lo: 0, brows: "sad", mouth: "wavy", look: "cross" },
+  sing: { lid: 0.75, lo: 0.3, brows: "up", mouth: "o" },
+  squeeze: { lid: 0.75, lo: 0.5, brows: "up", mouth: "smile" },
+  sneeze: { lid: 0.75, lo: 0.5, brows: "up", mouth: "yawn" },
+};
+
 // ink stacks an impact burst can be printed in
 const IMPACT_INKS: InkPass[][] = [
   [{ ink: "pink", a: 1 }],
@@ -91,6 +132,7 @@ type Blob = {
   hovered: boolean; pressAt: number; pressX: number; pressY: number;
   bornAt: number; popped: boolean;
   tapCount: number; lastTap: number;
+  expr: string; exprUntil: number; nextTic: number;
   emoteKind: string; emoteBorn: number; emoteDur: number; nextEmote: number;
   impact: SVGSVGElement; impactBorn: number; impactX: number; impactY: number; impactAngle: number; impactSize: number;
   impactUnder: SVGGElement; impactInk0: SVGGElement; impactInk1: SVGGElement;
@@ -256,6 +298,7 @@ export default function Blobs() {
         hovered: false, pressAt: -9, pressX: 0, pressY: 0,
         bornAt: 0.6 + i * 0.8 + rand() * 0.1, popped: false, // one at a time
         tapCount: 0, lastTap: -9,
+        expr: "", exprUntil: 0, nextTic: 4 + rand() * 6,
         impactBorn: -99, impactX: 0, impactY: 0, impactAngle: 0, impactSize: 1,
         impact: el.querySelector<SVGSVGElement>(".blob-impact")!,
         impactUnder: el.querySelector<SVGGElement>(".blob-impact .under")!,
@@ -296,7 +339,7 @@ export default function Blobs() {
       b.pop.style.transformOrigin = `50% ${c.bottom}%`;
       b.shadow.style.top = `${c.bottom - 8}%`;
 
-      el.addEventListener("pointerenter", () => { b.hovered = true; b.forceRender = true; });
+      el.addEventListener("pointerenter", () => { b.hovered = true; b.forceRender = true; if (b.state === "idle" || b.state === "wander") showEmote(b, "sparkle", 0.7); });
       el.addEventListener("pointerleave", () => { b.hovered = false; b.forceRender = true; });
       el.addEventListener("pointerdown", (e) => {
         e.preventDefault();
@@ -443,6 +486,8 @@ export default function Blobs() {
         b.hold = b.hop ? 1 : b.c.hold;
       }
     };
+    // Hold an expression for a moment (overrides whatever the state would show).
+    const setExpr = (b: Blob, name: string, dur: number) => { b.expr = name; b.exprUntil = t + dur; b.forceRender = true; };
     // A cartoon mark above the head for a moment.
     const showEmote = (b: Blob, kind: string, dur: number) => {
       if (b.emoteKind !== kind) {
@@ -615,7 +660,7 @@ export default function Blobs() {
       stumble(b, lvx, lvy, 0.12); // the landing skid is a step, not a slide
       b.shKick = 0.18;
       b.alt = 0;
-      if (h.power > 0.6) eyeWide(b, 0.17);
+      if (h.power > 0.6) { eyeWide(b, 0.17); if (b.state !== "thrown") setExpr(b, "proud", 0.8); }
       for (const o of blobs) {
         if (o === b || dist(o, b) > 260) continue;
         lookAt(o, { kind: "blob", blob: b }, 0.6, 0.5);
@@ -689,6 +734,7 @@ export default function Blobs() {
         case "nap":
           b.until = t + 8 + 12 * rand();
           b.napping = true;
+          setExpr(b, "yawn", 0.9);
           b.hold = 2;
           b.boilMul = 0.4;
           b.blinkUntil = 0;
@@ -720,6 +766,7 @@ export default function Blobs() {
         case "chase":
           chaseActive = true;
           b.until = t + 3 + 4 * rand();
+          if (b.role === "flee") showEmote(b, "sweats", 1.2);
           break;
         case "greet":
           b.partner = opts.partner ?? b.partner;
@@ -857,6 +904,7 @@ export default function Blobs() {
       lookAt(b, { kind: "blob", blob: other }, 1, 0.8);
       b.mood -= (impact > 250 ? 0.12 : 0.04) * (1.2 - b.c.P.social);
       b.forceRender = true;
+      if (impact > 250) { setExpr(b, "hurt", 0.6); if (rand() < 0.5) showEmote(b, "star", 0.7); }
       if (b.state === "grabbed" || b.state === "thrown") return;
       if (b.napping) {
         if (impact > 80) { b.mood -= 0.4; startle(b, other.x, other.y, 0.8 * b.c.P.jumpy); }
@@ -962,6 +1010,17 @@ export default function Blobs() {
         case "idle": {
           b.qTarget = 0.03 * Math.sin(TAU * 0.4 * b.stateT + b.i);
           if (b.c.eyeJitter) b.tremble = 1;
+          // little tics: think, hum, stretch, sneeze, get bored
+          if (t > b.nextTic && !b.hop && !b.stp && b.exprUntil < t) {
+            b.nextTic = t + 5 + rand() * 7;
+            const r = rand();
+            if (r < 0.25) { setExpr(b, "think", 1.6); showEmote(b, "dots", 1.6); lookAt(b, { kind: "point", x: b.x + 60, y: b.y - 200 }, 1, 1.6); }
+            else if (r < 0.45) { setExpr(b, "sing", 1.8); showEmote(b, "notes", 1.8); b.qv -= 1.2 * sqGain(b); }
+            else if (r < 0.6) { setExpr(b, "squeeze", 0.9); b.qv -= 3 * sqGain(b); b.sv += 1.2 * sqGain(b); }
+            else if (r < 0.72) { setExpr(b, "sneeze", 0.5); b.qv += 3.5 * sqGain(b); showEmote(b, "bang2", 0.6); b.nextTic = t + 8; }
+            else if (r < 0.85 && b.stateT > 6) { setExpr(b, "bored", 2.5); showEmote(b, "dots", 1.2); }
+            else { setExpr(b, "yawn", 0.9); }
+          }
           if (t > b.nextThink) {
             b.nextThink = t + 0.25;
             if (think(b)) return;
@@ -1061,6 +1120,7 @@ export default function Blobs() {
           if (t > b.until) {
             b.napping = false;
             b.qv -= 2 * sqGain(b);
+            setExpr(b, "yawn", 0.8);
             b.blinkUntil = t + 0.17;
             b.secondBlinkAt = t + 0.45;
             b.mood += 0.1;
@@ -1110,7 +1170,7 @@ export default function Blobs() {
             lookAt(b, { kind: "blob", blob: p }, 1, 0.3);
             if (!b.hop && rand() < 0.8 * P.jumpy * dt) startHop(b, dx / dd, dy / dd, 0.5);
             if (dd < b.r + p.r + 10) {
-              if (p.role === "flee") { endChase(b); go(b, "celebrate"); go(p, "celebrate"); return; }
+              if (p.role === "flee") { endChase(b); setExpr(b, "smug", 1.6); showEmote(b, "sparkle", 1.2); setExpr(p, "surprised", 0.8); go(b, "celebrate"); go(p, "celebrate"); return; }
             }
           } else {
             const dx = b.x - p.x, dy = b.y - p.y;
@@ -1143,7 +1203,7 @@ export default function Blobs() {
             if (t > b.until) { b.greetPhase = 2; const first = P.social >= p.c.P.social; b.nextHopAt = first ? t : t + 3 * FRAME; b.hopsLeft = rand() < 0.3 ? 2 : 1; }
           } else if (b.greetPhase === 2) {
             if (t > b.nextHopAt && !b.hop && b.hopsLeft > 0) { startHop(b, 0, 0, 0.15); b.hopsLeft--; b.nextHopAt = t + 0.5; }
-            if (b.hopsLeft === 0 && !b.hop) { b.greetPhase = 3; b.until = t + 0.6; b.mood += 0.2; showEmote(b, "heart", 1.3); }
+            if (b.hopsLeft === 0 && !b.hop) { b.greetPhase = 3; b.until = t + 0.6; b.mood += 0.2; showEmote(b, rand() < 0.5 ? "heart" : "hearts", 1.3); }
           } else {
             b.qTarget = 0.03 * Math.sin(TAU * 0.8 * b.stateT);
             if (t > b.until && b.initiator) {
@@ -1292,7 +1352,7 @@ export default function Blobs() {
         b.stickUntil = t + 0.15;
       }
       if (impact > 40 && !(b.hop && b.hop.phase === "air") && st !== "thrown") stumble(b, b.vx, b.vy, 0.15);
-      if (impact > 300) { eyeWide(b, 0.25); lookAt(b, { kind: "point", x: wx, y: wy }, 1, 0.5); }
+      if (impact > 300) { eyeWide(b, 0.25); lookAt(b, { kind: "point", x: wx, y: wy }, 1, 0.5); setExpr(b, "confused", 0.9); showEmote(b, "wow", 0.9); }
       if (impact > 500) {
         b.hv += (rand() < 0.5 ? -1 : 1) * impact / 60;
         if ((st === "wander" || st === "idle") && rand() < 0.4) { b.mood -= 0.1; startle(b, wx, wy, 0.3 * P.jumpy); }
@@ -1416,35 +1476,51 @@ export default function Blobs() {
         }
         const jx = c.eyeJitter && b.tremble && !reduced ? Math.round((rand() - 0.5) * 2) : 0;
         set(b, "face", b.face, "transform", `translate(${Math.round(ox + jx)}px, ${Math.round(oy)}px) rotate(${faceRot.toFixed(3)}rad)`);
-        // pupils look around inside the whites
+        // which face to wear: an event expression if one is held, else what the state calls for
+        const blinking = t < b.blinkUntil;
+        const alert = b.hovered && (b.state === "idle" || b.state === "wander");
+        let name: string;
+        if (t < b.exprUntil && b.expr) name = b.expr;
+        else if (b.state === "nap") name = "sleepy";
+        else if (b.state === "sulk") name = b.grudge ? "angry" : "sad";
+        else if (b.state === "celebrate") name = "laugh";
+        else if (b.state === "startled") name = "surprised";
+        else if (b.state === "curious") name = "curious";
+        else if (b.state === "thrown") name = b.dizzy ? "dizzy" : "scared";
+        else if (b.state === "chase") name = b.role === "chaser" ? "mischievous" : "scared";
+        else if (b.state === "greet") name = b.greetPhase === 3 ? "love" : "happy";
+        else if (b.state === "grabbed") name = "held";
+        else if (t < b.happyUntil) name = c.shy ? "shy" : "happy";
+        else if (alert) name = "excited";
+        else if (b.state === "idle" && b.stateT > 10) name = "bored";
+        else if (b.mood > 0.35) name = "happy";
+        else name = "neutral";
+        const E = EXPR[name] ?? EXPR.neutral;
+        // pupils: look around inside the whites, plus the expression's own glance
         b.pupils.forEach((g, k) => {
           const pr = b.pupilRange[k];
-          const px = clamp((gx / b.scale) * 0.6, -pr, pr), py = clamp((gy / b.scale) * 0.6, -pr, pr);
-          set(b, `pup${k}`, g, "transform", `translate(${px.toFixed(1)}px, ${py.toFixed(1)}px)${b.dilate ? " scale(1.25)" : ""}`);
+          let px = (gx / b.scale) * 0.6, py = (gy / b.scale) * 0.6;
+          if (E.look === "away") px = -px * 1.5;
+          else if (E.look === "up") py = -pr;
+          else if (E.look === "down") py = pr;
+          else if (E.look === "cross") { px = k === 0 ? pr : -pr; py = 0; }
+          px = clamp(px, -pr, pr); py = clamp(py, -pr, pr);
+          const ps = (E.pupil ?? 1) * (b.dilate ? 1.25 : 1);
+          set(b, `pup${k}`, g, "transform", `translate(${px.toFixed(1)}px, ${py.toFixed(1)}px)${ps !== 1 ? ` scale(${ps.toFixed(2)})` : ""}`);
         });
-        // lids: 0 open .. 0.75 shut. Resting droop per character, bored droop when idle, wide when surprised.
-        const blinking = t < b.blinkUntil;
-        const happy = t < b.happyUntil;
-        let lid = c.eyes.lidRest;
-        if (b.state === "idle") lid = Math.max(lid, Math.min(0.3, (b.stateT - 3) * 0.05));
-        const alert = b.hovered && (b.state === "idle" || b.state === "wander");
-        if (alert) lid = 0;
-        const laughing = b.state === "celebrate";
-        const angry = b.state === "sulk";
-        if (b.state === "nap") lid = 0.75;
-        else if (angry) lid = 0.5;
-        if (b.eyeScale > 1.05) lid = 0;
+        // lids: 0 open .. 0.75 shut, posed in eighths
+        let lid = Math.max(E.lid, name === "neutral" ? c.eyes.lidRest : 0);
+        if (alert && name === "excited") lid = 0;
         if (blinking && !b.winking) lid = 0.75;
-        lid = Math.round(lid * 8) / 8; // posed, not eased
+        lid = Math.round(lid * 8) / 8;
         b.lids.forEach((l, k) => {
           const amt = blinking && b.winking && k === 1 ? 0.75 : lid;
           set(b, `lid${k}`, l.el, "transform", `translate(0px, ${((amt - 1) * l.span).toFixed(1)}px)`);
         });
-        // lower lids rise for a happy ^ ^ (laughing, bashful)
-        const lo = laughing || happy ? 0.6 : 0;
+        const lo = Math.round(E.lo * 8) / 8;
         b.lidlos.forEach((l, k) => set(b, `lidlo${k}`, l.el, "transform", `translate(0px, ${((1 - lo) * l.span).toFixed(1)}px)`));
-        // brows: angry V, sad, raised, or one cocked
-        const browMode = angry ? "angry" : b.state === "thrown" && b.dizzy ? "sad" : b.state === "startled" || b.state === "grabbed" || laughing || b.eyeScale > 1.2 ? "up" : b.state === "curious" ? "quiz" : "";
+        // brows
+        const browMode = E.brows;
         set(b, "browsG", b.browsG, "opacity", browMode ? "1" : "0");
         const browT = (k: number) => {
           const sgn = k === 0 ? 1 : -1;
@@ -1452,14 +1528,21 @@ export default function Blobs() {
           if (browMode === "sad") return `translate(0px, 1px) rotate(${-sgn * 18}deg)`;
           if (browMode === "up") return "translate(0px, -4px)";
           if (browMode === "quiz") return k === 0 ? "translate(0px, -5px)" : "rotate(-10deg)";
+          if (browMode === "flat") return "translate(0px, 1px)";
           return "none";
         };
         b.brows.forEach((el, k) => set(b, `brow${k}`, el, "transform", browT(k)));
-        set(b, "cheeks", b.cheeks, "transform", happy ? "scale(1.35)" : "none");
-        const es = alert && b.eyeScale === 1 ? 1.12 : b.eyeScale; // perks up under the cursor
+        // cheeks, eye size, mouth
+        set(b, "cheeks", b.cheeks, "opacity", E.cheeks ? "0.8" : "0");
+        const es = Math.max(E.eye ?? 1, b.eyeScale);
         set(b, "eyes", b.eyesG, "transform", es === 1 ? "none" : `scale(${q(es, 0.05)})`);
-        // mouth: opens wide for a laugh, flips to a frown when sulking
-        set(b, "mouth", b.mouth, "transform", laughing ? "scale(1.4)" : angry ? "scale(1, -1)" : t < b.grinUntil ? "scaleX(1.2)" : "none");
+        const M = MOUTHS[E.mouth] ?? MOUTHS.small;
+        if (b.mouth && b.last.mouthD !== E.mouth) {
+          b.last.mouthD = E.mouth;
+          b.mouth.setAttribute("d", M.d);
+          b.mouth.setAttribute("fill", M.fill ? "currentColor" : "none");
+        }
+        set(b, "mouth", b.mouth, "transform", t < b.grinUntil ? "scaleX(1.2)" : "none");
         // cartoon mark above the head: pops in, jiggles, fades out, all in posed frames
         {
           const age = t - b.emoteBorn;
@@ -1574,6 +1657,7 @@ export default function Blobs() {
       w.__blobs = blobs;
       w.__blobTick = (dt, n) => { for (let i = 0; i < n; i++) tick(dt); };
       w.__blobGo = (i, s, opts) => go(blobs[i], s, opts);
+      (w as unknown as { __blobExpr: (i: number, name: string, dur: number) => void }).__blobExpr = (i, name, dur) => setExpr(blobs[i], name, dur);
     }
     render();
     raf = requestAnimationFrame(loop);

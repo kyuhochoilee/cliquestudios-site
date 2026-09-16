@@ -72,6 +72,7 @@ export type Char = {
   napProne: number;
   shy: boolean;
   eyes: { l: Eye; r: Eye; lidRest: number; lidLine: boolean };
+  mouth: { x: number; y: number; s: number }; // where the mouth sits and how big
   extras: string; // brows, mouth, cheeks: inline SVG in the same 0..100 box
 };
 
@@ -114,8 +115,9 @@ export const CAST: Char[] = [
     napProne: 0,
     shy: false,
     eyes: { l: { cx: 38, cy: 46, r: 9.5, pr: 5 }, r: { cx: 62, cy: 46, r: 9.5, pr: 5 }, lidRest: 0, lidLine: true },
+    mouth: { x: 50, y: 61, s: 1 },
     extras:
-      '<path class="mouth" d="M45 62 Q50 67 55 62" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>',
+      "",
   },
   {
     // A heavy, contented loaf that is asleep more often than not.
@@ -151,6 +153,7 @@ export const CAST: Char[] = [
     napProne: 1,
     shy: false,
     eyes: { l: { cx: 32, cy: 54, r: 9, pr: 4.5 }, r: { cx: 68, cy: 54, r: 9, pr: 4.5 }, lidRest: 0.55, lidLine: true },
+    mouth: { x: 50, y: 69, s: 1.15 },
     extras:
       "",
   },
@@ -188,6 +191,7 @@ export const CAST: Char[] = [
     napProne: 0.1,
     shy: false,
     eyes: { l: { cx: 36, cy: 48, r: 13, pr: 7 }, r: { cx: 62, cy: 48, r: 13, pr: 7 }, lidRest: 0, lidLine: true },
+    mouth: { x: 49, y: 69, s: 1 },
     extras:
       "",
   },
@@ -225,9 +229,9 @@ export const CAST: Char[] = [
     napProne: 0.15,
     shy: true,
     eyes: { l: { cx: 38, cy: 46, r: 11, pr: 6 }, r: { cx: 62, cy: 46, r: 11, pr: 6 }, lidRest: 0.1, lidLine: true },
+    mouth: { x: 50, y: 62, s: 1 },
     extras:
-      '<g class="cheeks" fill="#ff48b0" opacity="0.8"><ellipse cx="26" cy="59" rx="6.5" ry="3.8"/><ellipse cx="74" cy="59" rx="6.5" ry="3.8"/></g>' +
-      '<path class="mouth" d="M45 62 Q47.5 65.5 50 62 Q52.5 65.5 55 62" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>',
+      "",
   },
   {
     // A jolly jumping bean that treats the page as a trampoline.
@@ -263,10 +267,26 @@ export const CAST: Char[] = [
     napProne: 0.05,
     shy: false,
     eyes: { l: { cx: 39, cy: 44, r: 12, pr: 6.5 }, r: { cx: 62, cy: 41, r: 9, pr: 5 }, lidRest: 0, lidLine: true },
+    mouth: { x: 51, y: 63, s: 1.15 },
     extras:
-      '<path class="mouth" d="M43 60 Q51 72 59 60 Z"/>',
+      "",
   },
 ];
+
+/** Mouth shapes, centered on the mouth anchor, about 14 units wide. */
+export const MOUTHS: Record<string, { d: string; fill: boolean }> = {
+  smile: { d: "M-6 0 Q0 5 6 0", fill: false },
+  grin: { d: "M-7 -1 Q0 11 7 -1 Z", fill: true },
+  frown: { d: "M-6 2 Q0 -3 6 2", fill: false },
+  o: { d: "M-3 0 a3 3.6 0 1 0 6 0 a3 3.6 0 1 0 -6 0", fill: true },
+  yawn: { d: "M-4.5 0 a4.5 5.5 0 1 0 9 0 a4.5 5.5 0 1 0 -9 0", fill: true },
+  flat: { d: "M-5 0 L5 0", fill: false },
+  wavy: { d: "M-6 0 Q-3 -3 0 0 Q3 3 6 0", fill: false },
+  smirk: { d: "M-5 1 Q2 3 6.5 -2.5", fill: false },
+  small: { d: "M-2.5 0 Q0 2 2.5 0", fill: false },
+  w: { d: "M-6 0 Q-3 4 0 0 Q3 4 6 0", fill: false },
+  none: { d: "", fill: false },
+};
 
 /** Inline SVG for a face: whites, pupils with a catchlight, and an ink-colored lid per eye. */
 export function makeFace(c: Char, uid: string): string {
@@ -293,9 +313,13 @@ export function makeFace(c: Char, uid: string): string {
   };
   const brow = (e: Eye) =>
     `<path class="brow" d="M${e.cx - 5.5} ${e.cy - e.r - 5} Q${e.cx} ${e.cy - e.r - 8.5} ${e.cx + 5.5} ${e.cy - e.r - 5}"/>`;
+  const { l, r } = c.eyes;
+  const m = c.mouth;
   return (
-    `<g class="eyes">${eye(c.eyes.l, "l")}${eye(c.eyes.r, "r")}</g>` +
-    `<g class="brows" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" opacity="0">${brow(c.eyes.l)}${brow(c.eyes.r)}</g>` +
+    `<g class="cheeks" fill="${INKS.pink}" opacity="0"><ellipse cx="${l.cx - 12}" cy="${l.cy + 12}" rx="6.5" ry="3.8"/><ellipse cx="${r.cx + 12}" cy="${r.cy + 12}" rx="6.5" ry="3.8"/></g>` +
+    `<g class="eyes">${eye(l, "l")}${eye(r, "r")}</g>` +
+    `<g class="brows" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" opacity="0">${brow(l)}${brow(r)}</g>` +
+    `<g transform="translate(${m.x} ${m.y}) scale(${m.s})"><path class="mouth" d="${MOUTHS.smile.d}" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></g>` +
     c.extras
   );
 }
@@ -324,6 +348,33 @@ export const EMOTES: Record<string, string> = {
   dizzy:
     '<g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">' +
     '<path d="M20 15 m-8 0 a8 8 0 1 1 16 0 a5.5 5.5 0 1 1 -11 0 a3 3 0 1 1 6 0"/><path d="M4 6 L8 10 M8 6 L4 10"/><path d="M32 4 L36 8 M36 4 L32 8"/></g>',
+  sweat: '<path d="M22 4 C22 10 14 15 14 21 a8 8 0 0 0 16 0 C30 15 22 10 22 4 Z" fill="currentColor"/>',
+  sweats:
+    '<g fill="currentColor"><path d="M9 4 C9 8 4 11 4 15 a5 5 0 0 0 10 0 C14 11 9 8 9 4 Z"/>' +
+    '<path d="M21 9 C21 13 16 16 16 20 a5 5 0 0 0 10 0 C26 16 21 13 21 9 Z"/><path d="M33 3 C33 7 28 10 28 14 a5 5 0 0 0 10 0 C38 10 33 7 33 3 Z"/></g>',
+  notes:
+    '<g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M12 22 L12 6 L20 4 L20 19"/><circle cx="9" cy="22" r="3" fill="currentColor"/><circle cx="17" cy="19" r="3" fill="currentColor"/>' +
+    '<path d="M31 18 L31 7"/><circle cx="28" cy="18" r="3" fill="currentColor"/><path d="M31 7 Q36 8 35 12"/></g>',
+  sparkle:
+    '<g fill="currentColor"><path d="M20 2 L22.5 12 L32 14.5 L22.5 17 L20 27 L17.5 17 L8 14.5 L17.5 12 Z"/>' +
+    '<path d="M33 20 L34.5 25 L39.5 26.5 L34.5 28 L33 33 L31.5 28 L26.5 26.5 L31.5 25 Z"/><path d="M6 3 L7 6 L10 7 L7 8 L6 11 L5 8 L2 7 L5 6 Z"/></g>',
+  dots: '<g fill="currentColor"><circle cx="8" cy="16" r="3.2"/><circle cx="20" cy="16" r="3.2"/><circle cx="32" cy="16" r="3.2"/></g>',
+  bang2:
+    '<g fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round">' +
+    '<path d="M13 3 L12.5 17"/><path d="M12.5 23 L12.5 24"/><path d="M27 3 L26.5 17"/><path d="M26.5 23 L26.5 24"/></g>',
+  wow:
+    '<g fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round">' +
+    '<path d="M6 9 Q6 2 13 2.5 Q20 3 19 9 Q18 13 13 14 L13 18"/><path d="M13 24 L13 25"/><path d="M31 3 L30.5 17"/><path d="M30.5 23 L30.5 24"/></g>',
+  cloud:
+    '<path d="M10 20 a6 6 0 0 1 2 -11.5 a8 8 0 0 1 15 -1 a6 6 0 0 1 4 12.5 Z" fill="currentColor"/>' +
+    '<g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 24 L10 29"/><path d="M20 24 L18 29"/><path d="M28 24 L26 29"/></g>',
+  hearts:
+    '<g fill="currentColor"><path d="M10 15 C4 11 3 6 6.5 4.5 C8.5 3.5 10 4.5 10 6 C10 4.5 11.5 3.5 13.5 4.5 C17 6 16 11 10 15 Z"/>' +
+    '<path d="M27 27 C19 21 17 14 22 12 C24.5 11 27 12.5 27 15 C27 12.5 29.5 11 32 12 C37 14 35 21 27 27 Z"/><path d="M33 9 C29 6.5 28.5 3 31 2 C32.5 1.5 33 2.5 33 3.5 C33 2.5 33.5 1.5 35 2 C37.5 3 37 6.5 33 9 Z"/></g>',
+  star:
+    '<path d="M20 2 L24 14 L37 14 L26.5 21.5 L30.5 34 L20 26.5 L9.5 34 L13.5 21.5 L3 14 L16 14 Z" fill="currentColor"/>',
+  zap: '<path d="M23 2 L9 17 L18 17 L15 30 L31 12 L22 12 Z" fill="currentColor"/>',
 };
 
 /** Impact bursts. 40 x 40 box centered at (20,20), pointing +x; picked at random per hit. */
