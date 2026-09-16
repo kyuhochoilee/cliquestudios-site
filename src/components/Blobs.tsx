@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { CAST, EMOTES, IMPACTS, INKS, makeFace, mixInks, roundedPolygon, type Char, type InkPass } from "./cast";
+import { ACCESSORIES, CAST, EMOTES, IMPACTS, INKS, makeAccessory, makeFace, mixInks, roundedPolygon, type Char, type InkPass } from "./cast";
 
 /**
  * Five ink creatures on a sheet of paper. Physics and a small state machine
@@ -234,7 +234,9 @@ export default function Blobs() {
       }
       const g = body.querySelector("g");
       if (g) g.setAttribute("filter", d < 65 ? "url(#riso-edge-sm)" : "url(#riso-edge)");
-      face.innerHTML = makeFace(c, c.name.toLowerCase());
+      // a random accessory per visit; about one in four goes without
+      const acc = rand() < 0.25 ? "none" : ACCESSORIES[1 + Math.floor(rand() * (ACCESSORIES.length - 1))];
+      face.innerHTML = makeFace(c, c.name.toLowerCase()) + makeAccessory(acc, c);
       const r = (d * c.fill) / 2;
       const spot = openSpot(r);
       const way = openSpot(r);
@@ -1311,6 +1313,7 @@ export default function Blobs() {
         const h = Math.atan2(b.vy, b.vx);
         b.heading = lerpAngle(b.heading, h, 1 - Math.pow(0.0005, dt * b.c.headingRate));
       }
+      if (b.c.nose === null) b.hv = 0; // upright bodies never tumble
       b.heading += b.hv * dt;
       b.hv *= Math.pow(0.02, dt);
       // the squash axis follows the heading unless a push is holding it

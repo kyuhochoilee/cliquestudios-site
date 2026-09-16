@@ -159,12 +159,12 @@ export const CAST: Char[] = [
     name: "Pip",
     inks: [{ ink: "yellow", a: 1 }, { ink: "blue", a: 0.72 }],
     falloff: 30,
-    verts: [[89, 50], [59, 12], [13, 18], [13, 82], [59, 88]],
+    verts: [[50, 11], [12, 41], [18, 87], [82, 87], [88, 41]],
     radius: 11,
     fill: 0.76,
-    bottom: 88,
-    nose: 0,
-    lean: 0,
+    bottom: 87,
+    nose: null,
+    lean: deg(12),
     size: 70,
     P: { speed: 0.6, restless: 0.7, social: 1, jumpy: 0.45, squishy: 0.55 },
     gait: "amble",
@@ -341,6 +341,70 @@ export const IMPACTS: string[] = [
   // sparkle: dots and short strokes
   '<g fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="34" cy="12" r="3"/><circle cx="35" cy="29" r="2.4"/><circle cx="24" cy="36" r="2"/><path d="M26 20 L33 20" fill="none"/><path d="M23 10 L25 5" fill="none"/></g>',
 ];
+
+/** Accessories: a hat or glasses drawn in the black drum with an ink fill that lands a hair off. */
+export type Accessory = "none" | "specs" | "shades" | "party" | "beanie" | "bow" | "crown" | "flower" | "tophat";
+export const ACCESSORIES: Accessory[] = ["none", "specs", "shades", "party", "beanie", "bow", "crown", "flower", "tophat"];
+
+export function makeAccessory(kind: Accessory, c: Char): string {
+  if (kind === "none") return "";
+  const top = c.verts.reduce((a, v) => (v[1] < a[1] ? v : a));
+  const hx = top[0], hy = top[1] + 2;
+  const { l, r } = c.eyes;
+  // an ink fill printed a hair off, then the black outline
+  const pair = (d: string, ink: string, o = 2.2) =>
+    `<path d="${d}" transform="translate(0.9,-0.7)" fill="${ink}"/>` +
+    `<path d="${d}" fill="none" stroke="currentColor" stroke-width="${o}" stroke-linejoin="round" stroke-linecap="round"/>`;
+  const circ = (cx: number, cy: number, rr: number) => `M${cx - rr} ${cy} a${rr} ${rr} 0 1 0 ${rr * 2} 0 a${rr} ${rr} 0 1 0 ${-rr * 2} 0`;
+  switch (kind) {
+    case "specs":
+      return `<g class="acc" fill="none" stroke="currentColor" stroke-width="2.6">` +
+        `<circle cx="${l.cx}" cy="${l.cy}" r="${l.r + 3.5}"/><circle cx="${r.cx}" cy="${r.cy}" r="${r.r + 3.5}"/>` +
+        `<path d="M${l.cx + l.r + 3.5} ${l.cy - 2} Q${(l.cx + r.cx) / 2} ${l.cy - 6} ${r.cx - r.r - 3.5} ${r.cy - 2}"/></g>`;
+    case "shades":
+      return `<g class="acc">` +
+        `<circle cx="${l.cx}" cy="${l.cy}" r="${l.r + 3}" fill="${INKS.blue}" opacity="0.55" style="mix-blend-mode:multiply"/>` +
+        `<circle cx="${r.cx}" cy="${r.cy}" r="${r.r + 3}" fill="${INKS.blue}" opacity="0.55" style="mix-blend-mode:multiply"/>` +
+        `<g fill="none" stroke="currentColor" stroke-width="2.6"><circle cx="${l.cx}" cy="${l.cy}" r="${l.r + 3}"/><circle cx="${r.cx}" cy="${r.cy}" r="${r.r + 3}"/>` +
+        `<path d="M${l.cx - l.r - 3} ${l.cy - 4} L${r.cx + r.r + 3} ${r.cy - 4}"/></g></g>`;
+    case "party":
+      return `<g class="acc" transform="rotate(-8 ${hx} ${hy})">` +
+        pair(`M${hx - 13} ${hy + 3} L${hx} ${hy - 27} L${hx + 13} ${hy + 3} Z`, INKS.pink) +
+        `<path d="M${hx - 8} ${hy - 9} L${hx + 8} ${hy - 9} M${hx - 4} ${hy - 18} L${hx + 4} ${hy - 18}" stroke="${INKS.yellow}" stroke-width="3.5" transform="translate(0.9,-0.7)"/>` +
+        pair(circ(hx, hy - 28, 4.5), INKS.yellow) + `</g>`;
+    case "beanie":
+      return `<g class="acc">` +
+        pair(`M${hx - 17} ${hy + 5} Q${hx - 17} ${hy - 15} ${hx} ${hy - 15} Q${hx + 17} ${hy - 15} ${hx + 17} ${hy + 5} Z`, INKS.blue) +
+        pair(`M${hx - 18} ${hy} h36 v6 h-36 Z`, INKS.blue) +
+        pair(circ(hx, hy - 17, 4.5), INKS.yellow) + `</g>`;
+    case "bow": {
+      const bx = hx + 16, by = hy - 2;
+      return `<g class="acc" transform="rotate(20 ${bx} ${by})">` +
+        pair(`M${bx} ${by} Q${bx - 18} ${by - 12} ${bx - 14} ${by} Q${bx - 18} ${by + 12} ${bx} ${by} Z`, INKS.pink) +
+        pair(`M${bx} ${by} Q${bx + 18} ${by - 12} ${bx + 14} ${by} Q${bx + 18} ${by + 12} ${bx} ${by} Z`, INKS.pink) +
+        pair(circ(bx, by, 3.5), INKS.yellow) + `</g>`;
+    }
+    case "crown":
+      return `<g class="acc">` +
+        pair(`M${hx - 16} ${hy + 4} L${hx - 16} ${hy - 12} L${hx - 8} ${hy - 3} L${hx} ${hy - 16} L${hx + 8} ${hy - 3} L${hx + 16} ${hy - 12} L${hx + 16} ${hy + 4} Z`, INKS.yellow) +
+        `<g fill="${INKS.pink}" transform="translate(0.9,-0.7)"><circle cx="${hx - 16}" cy="${hy - 12}" r="2.4"/><circle cx="${hx}" cy="${hy - 16}" r="2.4"/><circle cx="${hx + 16}" cy="${hy - 12}" r="2.4"/></g></g>`;
+    case "flower": {
+      const fx = hx + 18, fy = hy + 1;
+      let petals = "";
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
+        petals += pair(circ(fx + Math.cos(a) * 5.5, fy + Math.sin(a) * 5.5, 4.6), INKS.pink, 2);
+      }
+      return `<g class="acc">${petals}${pair(circ(fx, fy, 3.6), INKS.yellow, 2)}</g>`;
+    }
+    case "tophat":
+      return `<g class="acc" transform="rotate(-6 ${hx} ${hy})">` +
+        pair(`M${hx - 19} ${hy + 1} h38 v5 h-38 Z`, INKS.black) +
+        pair(`M${hx - 12} ${hy + 1} v-23 h24 v23 Z`, INKS.black) +
+        `<path d="M${hx - 12} ${hy - 6} h24 v5 h-24 Z" fill="${INKS.pink}" transform="translate(0.9,-0.7)"/></g>`;
+  }
+  return "";
+}
 
 /** Closed path through `verts` with rounded corners, with an optional per-vertex jitter. */
 export function roundedPolygon(
