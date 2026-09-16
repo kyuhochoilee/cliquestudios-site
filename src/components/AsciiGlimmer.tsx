@@ -101,14 +101,14 @@ export default function AsciiGlimmer() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  const draw = useCallback(() => {
+  const draw = useCallback(function drawFrame() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     // Throttle to ~30fps — gentle, not demanding
     const now = performance.now();
     if (now - lastFrameRef.current < 33) {
-      animRef.current = requestAnimationFrame(draw);
+      animRef.current = requestAnimationFrame(drawFrame);
       return;
     }
     lastFrameRef.current = now;
@@ -202,7 +202,7 @@ export default function AsciiGlimmer() {
       }
     }
 
-    animRef.current = requestAnimationFrame(draw);
+    animRef.current = requestAnimationFrame(drawFrame);
   }, []);
 
   useEffect(() => {

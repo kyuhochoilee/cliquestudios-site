@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cliquestudios-site",
+  "account_id": "a014912489424bf125ffe8c47dc13a2e",
+  "compatibility_date": "2026-09-15",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./out",
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    {
+      "pattern": "cliquestudios.org",
+      "custom_domain": true
+    },
+    {
+      "pattern": "www.cliquestudios.org",
+      "custom_domain": true
+    }
+  ]
+}
