@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { ACCESSORIES, CAST, EMOTES, IMPACTS, INKS, makeAccessory, makeFace, mixInks, roundedPolygon, type Char, type InkPass } from "./cast";
+import { CAST, EMOTES, IMPACTS, INKS, makeFace, mixInks, roundedPolygon, type Char, type InkPass } from "./cast";
 
 /**
  * Five ink creatures on a sheet of paper. Physics and a small state machine
@@ -234,9 +234,7 @@ export default function Blobs() {
       }
       const g = body.querySelector("g");
       if (g) g.setAttribute("filter", d < 65 ? "url(#riso-edge-sm)" : "url(#riso-edge)");
-      // a random accessory per visit; about one in four goes without
-      const acc = rand() < 0.25 ? "none" : ACCESSORIES[1 + Math.floor(rand() * (ACCESSORIES.length - 1))];
-      face.innerHTML = makeFace(c, c.name.toLowerCase()) + makeAccessory(acc, c);
+      face.innerHTML = makeFace(c, c.name.toLowerCase());
       const r = (d * c.fill) / 2;
       const spot = openSpot(r);
       const way = openSpot(r);
