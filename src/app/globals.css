@@ -401,8 +401,8 @@ body {
   position: absolute;
   top: 0;
   left: 0;
-  width: 42%;
-  height: 42%;
+  width: 50%;
+  height: 50%;
   opacity: 0;
   transform-origin: center;
   pointer-events: none;

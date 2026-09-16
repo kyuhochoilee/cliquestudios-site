@@ -298,7 +298,7 @@ export default function Blobs() {
         hovered: false, pressAt: -9, pressX: 0, pressY: 0,
         bornAt: 0.6 + i * 0.8 + rand() * 0.1, popped: false, // one at a time
         tapCount: 0, lastTap: -9,
-        expr: "", exprUntil: 0, nextTic: 4 + rand() * 6,
+        expr: "", exprUntil: 0, nextTic: 16 + rand() * 20,
         impactBorn: -99, impactX: 0, impactY: 0, impactAngle: 0, impactSize: 1,
         impact: el.querySelector<SVGSVGElement>(".blob-impact")!,
         impactUnder: el.querySelector<SVGGElement>(".blob-impact .under")!,
@@ -664,7 +664,7 @@ export default function Blobs() {
       for (const o of blobs) {
         if (o === b || dist(o, b) > 260) continue;
         lookAt(o, { kind: "blob", blob: b }, 0.6, 0.5);
-        if ((h.power > 0.7 || b.state === "thrown") && (o.state === "idle" || o.state === "wander") && rand() < (b.state === "thrown" ? 0.5 : 0.25)) {
+        if ((h.power > 0.7 || b.state === "thrown") && (o.state === "idle" || o.state === "wander") && rand() < (b.state === "thrown" ? 0.3 : 0.12)) {
           o.curiousT = { kind: "blob", blob: b };
           o.until = t + 0.1 + rand() * 0.2; // staggered
           o.nextThink = t;
@@ -720,7 +720,7 @@ export default function Blobs() {
       b.boilMul = 1;
       switch (next) {
         case "idle":
-          b.until = t + (6 - 4.5 * b.c.P.restless) * (0.6 + 0.8 * rand());
+          b.until = t + (9 - 5 * b.c.P.restless) * (0.7 + 0.8 * rand());
           b.hold = Math.max(b.hold, 2);
           b.boilMul = 0.7;
           b.nextThink = t + 0.3;
@@ -766,11 +766,11 @@ export default function Blobs() {
         case "chase":
           chaseActive = true;
           b.until = t + 3 + 4 * rand();
-          if (b.role === "flee") showEmote(b, "sweats", 1.2);
+          if (b.role === "flee" && rand() < 0.5) showEmote(b, "sweats", 1.2);
           break;
         case "greet":
           b.partner = opts.partner ?? b.partner;
-          b.coolGreet = t + 8;
+          b.coolGreet = t + 35;
           b.greetPhase = 0;
           b.until = t + 1.2;
           if (b.partner) lookAt(b, { kind: "blob", blob: b.partner }, 1, 6);
@@ -780,7 +780,7 @@ export default function Blobs() {
           b.until = t + 3 + 5 * (1 - b.c.P.social);
           b.hold = 2;
           showEmote(b, "angry", 2.4);
-          b.nextEmote = t + 4;
+          b.nextEmote = t + 9;
           b.boilMul = 0.5;
           b.squint = 0.55;
           const right = b.grudge ? b.grudge.x > b.x : rand() < 0.5;
@@ -841,8 +841,8 @@ export default function Blobs() {
     };
     const chain = (b: Blob) => {
       for (const o of blobs) {
-        if (o === b || o.state === "startled" || o.coolStartle > t || dist(o, b) > 220) continue;
-        const p = o.napping ? 0.5 : 0.1 + 0.7 * o.c.P.jumpy;
+        if (o === b || o.state === "startled" || o.coolStartle > t || dist(o, b) > 180) continue;
+        const p = o.napping ? 0.35 : 0.05 + 0.45 * o.c.P.jumpy;
         if (rand() < p) {
           o.startleAt = t + (1 + Math.round(rand())) * FRAME;
           o.startleX = b.x;
@@ -875,7 +875,7 @@ export default function Blobs() {
       b.impactX = b.d / 2 + nx * b.r;
       b.impactY = b.d / 2 + ny * b.r;
       b.impactAngle = Math.atan2(ny, nx) + (rand() - 0.5) * 1.2; // off the contact angle a bit
-      b.impactSize = clamp(strength / 700, 0.35, 1.05) * (0.85 + rand() * 0.3);
+      b.impactSize = clamp(strength / 500, 0.7, 1.4) * (0.85 + rand() * 0.3);
       // a fresh shape and a fresh ink stack every hit
       const glyph = IMPACTS[Math.floor(rand() * IMPACTS.length)];
       const stack = IMPACT_INKS[Math.floor(rand() * IMPACT_INKS.length)];
@@ -888,9 +888,9 @@ export default function Blobs() {
       b.forceRender = true;
     };
     const bump = (b: Blob, other: Blob, nx: number, ny: number, impact: number) => {
-      // one burst per collision, on whoever was moving faster (ties go to the first)
+      // one burst per real collision (soft nudges get none), on whoever was moving faster (ties go to the first)
       const vb = Math.hypot(b.vx, b.vy), vo = Math.hypot(other.vx, other.vy);
-      if (vb > vo || (vb === vo && b.i < other.i)) showImpact(b, nx, ny, impact);
+      if (impact > 140 && (vb > vo || (vb === vo && b.i < other.i))) showImpact(b, nx, ny, impact);
       // squash along the contact normal, anchored on the far side so the pushed side caves in
       b.ax = Math.atan2(ny, nx);
       b.axUntil = t + 0.45;
@@ -906,18 +906,18 @@ export default function Blobs() {
       lookAt(b, { kind: "blob", blob: other }, 1, 0.8);
       b.mood -= (impact > 250 ? 0.12 : 0.04) * (1.2 - b.c.P.social);
       b.forceRender = true;
-      if (impact > 250) { setExpr(b, "hurt", 0.6); if (rand() < 0.5) showEmote(b, "star", 0.7); }
+      if (impact > 250) { setExpr(b, "hurt", 0.6); if (impact > 420 && rand() < 0.25) showEmote(b, "star", 0.7); }
       if (b.state === "grabbed" || b.state === "thrown") return;
       if (b.napping) {
         if (impact > 80) { b.mood -= 0.4; startle(b, other.x, other.y, 0.8 * b.c.P.jumpy); }
         return;
       }
       const slower = Math.hypot(b.vx, b.vy) <= Math.hypot(other.vx, other.vy);
-      if (impact > 250) {
-        if (slower && rand() < (1 - b.c.P.social) * 0.7) go(b, "sulk", { grudge: other });
+      if (impact > 360) {
+        if (slower && rand() < (1 - b.c.P.social) * 0.3) go(b, "sulk", { grudge: other });
         else if (!slower && b.c.P.social > 0.6 && rand() < 0.5 && greetable(other) && greetable(b)) { go(b, "greet", { partner: other }); go(other, "greet", { partner: b }); b.initiator = true; other.initiator = false; }
         else eyeWide(b, 0.25);
-      } else if (rand() < b.c.P.social * 0.5 && greetable(b) && greetable(other)) {
+      } else if (rand() < b.c.P.social * 0.1 && greetable(b) && greetable(other)) {
         go(b, "greet", { partner: other }); go(other, "greet", { partner: b }); b.initiator = true; other.initiator = false;
       } else eyeWide(b, 0.17);
       if (b.state === "sulk") { b.mood -= 0.3; b.until += 2; }
@@ -932,7 +932,7 @@ export default function Blobs() {
           const a = blobs[i], c = blobs[j];
           const dx = c.x - a.x, dy = c.y - a.y;
           const dd = Math.hypot(dx, dy) || 1;
-          const minDist = a.r + c.r + 6 + (a.napping || c.napping ? 24 : 0);
+          const minDist = a.r + c.r + 10 + (a.napping || c.napping ? 24 : 0);
           if (dd >= minDist) continue;
           const nx = dx / dd, ny = dy / dd;
           // positional separation, weighted by mass, so nobody slides: they just un-squish apart
@@ -975,11 +975,11 @@ export default function Blobs() {
       if (pointer.known) {
         const pd = dist(b, pointer);
         const toward = ((b.x - pointer.x) * pointer.vx + (b.y - pointer.y) * pointer.vy) / (pd || 1);
-        if (toward > 600 && pd < b.r + 160 && b.coolStartle < t && rand() < 0.3 + 0.6 * P.jumpy) { startle(b, pointer.x, pointer.y, 0.9 * P.jumpy); return true; }
-        if (pd < b.r + 300 && pointer.speed < 40 && b.coolCurious < t && rand() < 0.06 * (0.4 + 0.6 * P.social)) { b.curiousT = { kind: "pointer" }; go(b, "curious"); return true; }
+        if (toward > 600 && pd < b.r + 160 && b.coolStartle < t && rand() < 0.2 + 0.4 * P.jumpy) { startle(b, pointer.x, pointer.y, 0.9 * P.jumpy); return true; }
+        if (pd < b.r + 300 && pointer.speed < 40 && b.coolCurious < t && rand() < 0.03 * (0.4 + 0.6 * P.social)) { b.curiousT = { kind: "pointer" }; go(b, "curious"); return true; }
       }
       const n = nearest(b, 140);
-      if (n && greetable(b) && greetable(n) && rand() < 0.2 * P.social * n.c.P.social) {
+      if (n && greetable(b) && greetable(n) && rand() < 0.008 * P.social * n.c.P.social) {
         go(b, "greet", { partner: n }); go(n, "greet", { partner: b }); b.initiator = true; n.initiator = false; return true;
       }
       if (b.c.shy && b.coolPuff < t) {
@@ -1014,13 +1014,13 @@ export default function Blobs() {
           if (b.c.eyeJitter) b.tremble = 1;
           // little tics: think, hum, stretch, sneeze, get bored
           if (t > b.nextTic && !b.hop && !b.stp && b.exprUntil < t) {
-            b.nextTic = t + 5 + rand() * 7;
+            b.nextTic = t + 26 + rand() * 30;
             const r = rand();
             if (r < 0.25) { setExpr(b, "think", 1.6); showEmote(b, "dots", 1.6); lookAt(b, { kind: "point", x: b.x + 60, y: b.y - 200 }, 1, 1.6); }
             else if (r < 0.45) { setExpr(b, "sing", 1.8); showEmote(b, "notes", 1.8); b.qv -= 1.2 * sqGain(b); }
             else if (r < 0.6) { setExpr(b, "squeeze", 0.9); b.qv -= 3 * sqGain(b); b.sv += 1.2 * sqGain(b); }
-            else if (r < 0.72) { setExpr(b, "sneeze", 0.5); b.qv += 3.5 * sqGain(b); showEmote(b, "bang2", 0.6); b.nextTic = t + 8; }
-            else if (r < 0.85 && b.stateT > 6) { setExpr(b, "bored", 2.5); showEmote(b, "dots", 1.2); }
+            else if (r < 0.72) { setExpr(b, "sneeze", 0.5); b.qv += 3.5 * sqGain(b); showEmote(b, "bang2", 0.6); b.nextTic = t + 16; }
+            else if (r < 0.85 && b.stateT > 6) { setExpr(b, "bored", 2.5); }
             else { setExpr(b, "yawn", 0.9); }
           }
           if (t > b.nextThink) {
@@ -1038,9 +1038,9 @@ export default function Blobs() {
           }
           if (t > b.until) {
             const w = [
-              ["wander", 6], ["hop", 1 + 5 * P.jumpy],
-              ["chase", chaseActive ? 0 : 1.5 * P.social * P.restless],
-              ["idle", 1],
+              ["wander", 6], ["hop", 0.5 + 3 * P.jumpy],
+              ["chase", chaseActive ? 0 : 0.4 * P.social * P.restless],
+              ["idle", 3],
             ] as const;
             let sum = 0; for (const [, v] of w) sum += v;
             let r = rand() * sum;
@@ -1069,7 +1069,7 @@ export default function Blobs() {
           const ux = dx / dd, uy = dy / dd;
           if (b.c.gait === "hoppy") {
             if (!b.hop && !b.hopQueue.length && t > b.nextHopAt) {
-              b.nextHopAt = t + 0.75;
+              b.nextHopAt = t + 1.0;
               if (rand() < 0.12) { startHop(b, ux, uy, 0.3); b.hopQueue = [0.35, 0.6]; }
               else startHop(b, ux, uy, 0.25);
             }
@@ -1085,13 +1085,13 @@ export default function Blobs() {
               if (!back && rand() < 0.15) {
                 // the double-take: freeze, look at you, bolt the other way
                 b.dt2 = 1; b.nextDash = t + 0.45; eyeWide(b, 0.4); lookAt(b, { kind: "pointer" }, 1, 0.6);
-              } else { b.dt2 = 0; b.nextDash = t + 1.2 + 2.5 * rand(); }
+              } else { b.dt2 = 0; b.nextDash = t + 2 + 3.5 * rand(); }
               b.tremble = 0;
             }
           } else {
             step(b, ux, uy, (16 + 26 * P.speed) * (b.c.gait === "drift" ? 0.5 : 1.2), 0.32 + 0.38 * (1 - P.speed));
           }
-          if (!b.hop && b.c.gait !== "hoppy" && b.c.gait !== "dart" && rand() < (0.05 + 0.5 * P.jumpy) * dt) {
+          if (!b.hop && b.c.gait !== "hoppy" && b.c.gait !== "dart" && rand() < (0.02 + 0.25 * P.jumpy) * dt) {
             const a = Math.atan2(uy, ux) + (rand() - 0.5) * 1;
             startHop(b, Math.cos(a), Math.sin(a), (0.3 + 0.5 * rand()) * (0.3 + 0.7 * P.jumpy));
           }
@@ -1228,7 +1228,7 @@ export default function Blobs() {
           break;
         }
         case "sulk": {
-          if (t > b.nextEmote) { b.nextEmote = t + 4 + 2 * rand(); showEmote(b, "angry", 2); }
+          if (t > b.nextEmote) { b.nextEmote = t + 9 + 5 * rand(); showEmote(b, "angry", 2); }
           if (b.stateT < 1 && b.grudge) {
             const dx = b.x - b.grudge.x, dy = b.y - b.grudge.y;
             const dd = Math.hypot(dx, dy) || 1;
@@ -1354,7 +1354,7 @@ export default function Blobs() {
         b.stickUntil = t + 0.15;
       }
       if (impact > 40 && !(b.hop && b.hop.phase === "air") && st !== "thrown") stumble(b, b.vx, b.vy, 0.15);
-      if (impact > 300) { eyeWide(b, 0.25); lookAt(b, { kind: "point", x: wx, y: wy }, 1, 0.5); setExpr(b, "confused", 0.9); showEmote(b, "wow", 0.9); }
+      if (impact > 300) { eyeWide(b, 0.25); lookAt(b, { kind: "point", x: wx, y: wy }, 1, 0.5); setExpr(b, "confused", 0.9); if (impact > 450 && rand() < 0.5) showEmote(b, "wow", 0.9); }
       if (impact > 500) {
         b.hv += (rand() < 0.5 ? -1 : 1) * impact / 60;
         if ((st === "wander" || st === "idle") && rand() < 0.4) { b.mood -= 0.1; startle(b, wx, wy, 0.3 * P.jumpy); }
@@ -1574,7 +1574,7 @@ export default function Blobs() {
             const f = Math.floor(age * 12);
             const HIT = [0.5, 1.35, 1.1, 0.85, 0.55];
             const sc = (HIT[Math.min(f, HIT.length - 1)] * b.impactSize).toFixed(2);
-            const w = b.d * 0.42;
+            const w = b.d * 0.5;
             set(b, "imp", b.impact, "opacity", f >= 4 ? "0.5" : "1");
             set(b, "impt", b.impact, "transform", `translate(${Math.round(b.impactX - w / 2)}px, ${Math.round(b.impactY - w / 2)}px) rotate(${(b.impactAngle * 180 / Math.PI).toFixed(0)}deg) scale(${sc})`);
           }
