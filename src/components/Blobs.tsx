@@ -11,6 +11,15 @@ import { CAST, EMOTES, makeFace, roundedPolygon, type Char } from "./cast";
 
 const FPS = 24; // motion at 24, the outline boil still re-rolls at 12
 const Z_LIFE = 2.6; // seconds a sleep Z takes to float away
+// riso inks for the marks above the head; a black pass sits under each, a hair off
+const EMOTE_INK: Record<string, string> = {
+  laugh: "#ff6c2f",
+  angry: "#f15060",
+  bang: "#ffb511",
+  q: "#0078bf",
+  heart: "#ff48b0",
+  dizzy: "#9d7ad2",
+};
 const Z_PATHS = [
   "M3.5 4.5 C7 3.5 11 4 15.5 3.5 L4 15.5 C8 15 12 15.5 16.5 15",
   "M3 4 C6.5 4.5 10.5 3 15 4 L4.5 15 C9 16 12.5 14.5 16 15.5",
@@ -68,6 +77,8 @@ type Blob = {
   brows: SVGElement[];
   emote: SVGSVGElement;
   emoteG: SVGGElement;
+  emoteUnder: SVGGElement;
+  hovered: boolean; pressAt: number; pressX: number; pressY: number;
   emoteKind: string; emoteBorn: number; emoteDur: number; nextEmote: number;
   ax: number; axUntil: number; anchorX: number; anchorY: number; // squash axis + anchor after a push
   mouth: SVGElement | null;
@@ -216,7 +227,9 @@ export default function Blobs() {
         browsG: face.querySelector<SVGElement>(".brows"),
         brows: Array.from(face.querySelectorAll<SVGElement>(".brow")),
         emote: el.querySelector<SVGSVGElement>(".blob-emote")!,
-        emoteG: el.querySelector<SVGGElement>(".blob-emote g")!,
+        emoteG: el.querySelector<SVGGElement>(".blob-emote .over")!,
+        emoteUnder: el.querySelector<SVGGElement>(".blob-emote .under")!,
+        hovered: false, pressAt: -9, pressX: 0, pressY: 0,
         emoteKind: "", emoteBorn: -99, emoteDur: 0, nextEmote: 0,
         ax: 0, axUntil: 0, anchorX: 0, anchorY: 0,
         mouth: face.querySelector<SVGElement>(".mouth"),
@@ -252,6 +265,8 @@ export default function Blobs() {
       b.pop.style.transformOrigin = `50% ${c.bottom}%`;
       b.shadow.style.top = `${c.bottom - 8}%`;
 
+      el.addEventListener("pointerenter", () => { b.hovered = true; b.forceRender = true; });
+      el.addEventListener("pointerleave", () => { b.hovered = false; b.forceRender = true; });
       el.addEventListener("pointerdown", (e) => {
         e.preventDefault();
         try { el.setPointerCapture(e.pointerId); } catch {}
@@ -263,6 +278,10 @@ export default function Blobs() {
         b.gx = e.clientX - b.x;
         b.gy = e.clientY - b.y;
         b.hist = [];
+        b.pressAt = t;
+        b.pressX = e.clientX;
+        b.pressY = e.clientY;
+        b.qv += 4 * sqGain(b); // pressed flat, then the held pose springs it tall
         el.classList.add("is-grabbed");
         go(b, "grabbed");
       });
@@ -271,6 +290,17 @@ export default function Blobs() {
         b.grabbed = false;
         el.classList.remove("is-grabbed");
         if (e.pointerType === "touch") pointer.expire = t + 0.8;
+        // a quick tap: a delighted boing, no throw
+        if (t - b.pressAt < 0.28 && Math.hypot(e.clientX - b.pressX, e.clientY - b.pressY) < 8) {
+          b.vx = 0; b.vy = 0;
+          go(b, "idle");
+          b.until = t + 1.6;
+          startHop(b, 0, 0, 0.35);
+          b.happyUntil = t + 1.3;
+          b.mood += 0.3;
+          showEmote(b, "laugh", 1.3);
+          return;
+        }
         const past = b.hist.find((h) => t - h.t >= 0.06) ?? b.hist[0];
         let sp = 0;
         if (past && t - past.t > 0) {
@@ -376,7 +406,13 @@ export default function Blobs() {
     };
     // A cartoon mark above the head for a moment.
     const showEmote = (b: Blob, kind: string, dur: number) => {
-      if (b.emoteKind !== kind) { b.emoteG.innerHTML = EMOTES[kind] ?? ""; b.emoteKind = kind; }
+      if (b.emoteKind !== kind) {
+        const glyph = EMOTES[kind] ?? "";
+        b.emoteG.innerHTML = glyph;
+        b.emoteUnder.innerHTML = glyph;
+        b.emoteG.style.color = EMOTE_INK[kind] ?? "";
+        b.emoteKind = kind;
+      }
       b.emoteBorn = t;
       b.emoteDur = dur;
       b.forceRender = true;
@@ -630,6 +666,8 @@ export default function Blobs() {
           b.eyeScale = 1.25;
           b.eyeScaleUntil = t + 60;
           b.hold = 1;
+          b.boilMul = 2.2; // nervous outline while held
+          showEmote(b, "bang", 0.5);
           if (b.c.name === "Loaf" && b.prev === "nap") { b.eyeScale = 1.35; b.eyeScaleUntil = t + 0.17; }
           for (const o of blobs) if (o.partner === b) { o.partner = null; if (o.state === "greet" || o.state === "chase") { eyeWide(o, 0.25); go(o, "idle"); } }
           break;
@@ -1211,7 +1249,7 @@ export default function Blobs() {
 
         const sh = (1 - 0.45 * alt) * (1 + 0.3 * Math.max(0, b.s)) + b.shKick;
         set(b, "sh", b.shadow, "transform", `scaleX(${q(sh, 0.05)}) scaleY(${q(1 - 0.3 * alt, 0.05)})`);
-        set(b, "sho", b.shadow, "opacity", alt > 0.5 ? "0.5" : "1");
+        set(b, "sho", b.shadow, "opacity", alt > 0.5 ? "0.3" : "1");
 
         const sx = 1 + b.s, sy = 1 - 0.6 * b.s;
         const h = q5deg(b.heading);
@@ -1262,6 +1300,8 @@ export default function Blobs() {
         const happy = t < b.happyUntil;
         let lid = c.eyes.lidRest;
         if (b.state === "idle") lid = Math.max(lid, Math.min(0.3, (b.stateT - 3) * 0.05));
+        const alert = b.hovered && (b.state === "idle" || b.state === "wander");
+        if (alert) lid = 0;
         const laughing = b.state === "celebrate";
         const angry = b.state === "sulk";
         if (b.state === "nap") lid = 0.75;
@@ -1277,7 +1317,7 @@ export default function Blobs() {
         const lo = laughing || happy ? 0.6 : 0;
         b.lidlos.forEach((l, k) => set(b, `lidlo${k}`, l.el, "transform", `translate(0px, ${((1 - lo) * l.span).toFixed(1)}px)`));
         // brows: angry V, sad, raised, or one cocked
-        const browMode = angry ? "angry" : b.state === "thrown" && b.dizzy ? "sad" : b.state === "startled" || laughing || b.eyeScale > 1.2 ? "up" : b.state === "curious" ? "quiz" : "";
+        const browMode = angry ? "angry" : b.state === "thrown" && b.dizzy ? "sad" : b.state === "startled" || b.state === "grabbed" || laughing || b.eyeScale > 1.2 ? "up" : b.state === "curious" ? "quiz" : "";
         set(b, "browsG", b.browsG, "opacity", browMode ? "1" : "0");
         const browT = (k: number) => {
           const sgn = k === 0 ? 1 : -1;
@@ -1289,7 +1329,7 @@ export default function Blobs() {
         };
         b.brows.forEach((el, k) => set(b, `brow${k}`, el, "transform", browT(k)));
         set(b, "cheeks", b.cheeks, "transform", happy ? "scale(1.35)" : "none");
-        const es = b.eyeScale;
+        const es = alert && b.eyeScale === 1 ? 1.12 : b.eyeScale; // perks up under the cursor
         set(b, "eyes", b.eyesG, "transform", es === 1 ? "none" : `scale(${q(es, 0.05)})`);
         // mouth: opens wide for a laugh, flips to a frown when sulking
         set(b, "mouth", b.mouth, "transform", laughing ? "scale(1.4)" : angry ? "scale(1, -1)" : t < b.grinUntil ? "scaleX(1.2)" : "none");
@@ -1300,13 +1340,17 @@ export default function Blobs() {
           else {
             const f = Math.floor(age * 12);
             const left = b.emoteDur - age;
-            const sc = f === 0 ? 0.5 : f === 1 ? 1.15 : 1;
-            const rot = f < 2 ? 0 : f % 4 < 2 ? 4 : -4;
-            const op = left < 0.25 ? 0.25 : left < 0.5 ? 0.5 : 1;
-            const x = b.d * 0.5 - b.d * 0.25;
-            const y = b.d * (c.bottom / 100 - 0.95) - b.d * 0.34;
+            // pop in with an overshoot, settle, jiggle, then shrink away
+            const POP = [0.2, 1.35, 0.85, 1.1, 0.96, 1];
+            let sc = f < POP.length ? POP[f] : 1;
+            let rot = f < 2 ? -10 : f === 2 ? 6 : f % 4 < 2 ? 3 : -3;
+            if (left < 0.3) { sc = left < 0.1 ? 0.4 : left < 0.2 ? 0.7 : 0.9; rot = 0; }
+            const op = left < 0.1 ? 0.5 : 1;
+            // top corner of the character, leaning away from it
+            const x = b.d * 0.62;
+            const y = b.d * 0.1 - b.d * 0.3;
             set(b, "emo", b.emote, "opacity", String(op));
-            set(b, "emot", b.emote, "transform", `translate(${Math.round(x)}px, ${Math.round(y)}px) rotate(${rot}deg) scale(${sc})`);
+            set(b, "emot", b.emote, "transform", `translate(${Math.round(x)}px, ${Math.round(y)}px) rotate(${rot + 8}deg) scale(${sc})`);
           }
         }
         // sleep Z's: float up from the head in stop-motion steps, growing and fading
@@ -1415,7 +1459,8 @@ export default function Blobs() {
             <svg className="blob-face" viewBox="0 0 100 100" overflow="visible" />
           </div>
           <svg className="blob-emote" viewBox="0 0 40 30" overflow="visible">
-            <g />
+            <g className="under" />
+            <g className="over" />
           </svg>
           <div className="blob-zs">
             {[0, 1, 2].map((k) => (

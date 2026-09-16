@@ -344,9 +344,13 @@ body {
   height: 37.5%;
   color: var(--color-fg);
   opacity: 0;
-  transform-origin: 50% 100%;
+  transform-origin: 15% 100%; /* pops out of the character's corner */
   pointer-events: none;
   will-change: transform, opacity;
+}
+.blob-emote .under {
+  color: var(--color-fg); /* the black drum, printed a hair off */
+  transform: translate(1.4px, -1px);
 }
 .blob-face .brow {
   transform-box: fill-box;
