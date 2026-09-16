@@ -875,7 +875,7 @@ export default function Blobs() {
       b.impactX = b.d / 2 + nx * b.r;
       b.impactY = b.d / 2 + ny * b.r;
       b.impactAngle = Math.atan2(ny, nx) + (rand() - 0.5) * 1.2; // off the contact angle a bit
-      b.impactSize = clamp(strength / 500, 0.5, 1.6) * (0.8 + rand() * 0.5);
+      b.impactSize = clamp(strength / 700, 0.35, 1.05) * (0.85 + rand() * 0.3);
       // a fresh shape and a fresh ink stack every hit
       const glyph = IMPACTS[Math.floor(rand() * IMPACTS.length)];
       const stack = IMPACT_INKS[Math.floor(rand() * IMPACT_INKS.length)];
@@ -888,7 +888,9 @@ export default function Blobs() {
       b.forceRender = true;
     };
     const bump = (b: Blob, other: Blob, nx: number, ny: number, impact: number) => {
-      showImpact(b, nx, ny, impact);
+      // one burst per collision, on whoever was moving faster (ties go to the first)
+      const vb = Math.hypot(b.vx, b.vy), vo = Math.hypot(other.vx, other.vy);
+      if (vb > vo || (vb === vo && b.i < other.i)) showImpact(b, nx, ny, impact);
       // squash along the contact normal, anchored on the far side so the pushed side caves in
       b.ax = Math.atan2(ny, nx);
       b.axUntil = t + 0.45;
@@ -1572,7 +1574,7 @@ export default function Blobs() {
             const f = Math.floor(age * 12);
             const HIT = [0.5, 1.35, 1.1, 0.85, 0.55];
             const sc = (HIT[Math.min(f, HIT.length - 1)] * b.impactSize).toFixed(2);
-            const w = b.d * 0.55;
+            const w = b.d * 0.42;
             set(b, "imp", b.impact, "opacity", f >= 4 ? "0.5" : "1");
             set(b, "impt", b.impact, "transform", `translate(${Math.round(b.impactX - w / 2)}px, ${Math.round(b.impactY - w / 2)}px) rotate(${(b.impactAngle * 180 / Math.PI).toFixed(0)}deg) scale(${sc})`);
           }
