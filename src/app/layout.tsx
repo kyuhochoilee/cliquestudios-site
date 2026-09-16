@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
-import { Inter, Geist_Mono } from "next/font/google";
+import { Fraunces, Figtree } from "next/font/google";
+import RisoDefs from "@/components/RisoDefs";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
   subsets: ["latin"],
+  axes: ["opsz"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const figtree = Figtree({
+  variable: "--font-figtree",
   subsets: ["latin"],
 });
 
@@ -28,10 +30,7 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover" as const,
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fafaf9" },
-    { media: "(prefers-color-scheme: dark)", color: "#0c0a09" },
-  ],
+  themeColor: "#f7f4ec",
 };
 
 export default function RootLayout({
@@ -42,10 +41,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${geistMono.variable}`}
-      suppressHydrationWarning
+      className={`${fraunces.variable} ${figtree.variable}`}
     >
       <body className="antialiased">
+        <RisoDefs />
         {children}
       </body>
     </html>
