@@ -22,6 +22,7 @@ export default function Home() {
           <span className="pass pass-y" aria-hidden="true">Clique Studios</span>
           <span className="pass pass-p" aria-hidden="true">Clique Studios</span>
           <span className="pass pass-b" aria-hidden="true">Clique Studios</span>
+          <span className="pass pass-k" aria-hidden="true">Clique Studios</span>
         </h1>
       </div>
 
