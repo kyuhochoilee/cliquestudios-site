@@ -290,6 +290,10 @@ export function makeFace(c: Char, uid: string): string {
 
 /** Cartoon marks that pop up above a head. 40 x 30 box, drawn in the black drum. */
 export const EMOTES: Record<string, string> = {
+  pop:
+    '<g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">' +
+    '<path d="M20 2 L20 7"/><path d="M7 7 L11 10.5"/><path d="M33 7 L29 10.5"/><path d="M3 19 L8 19"/><path d="M37 19 L32 19"/>' +
+    '<path d="M8 29 L11.5 25.5"/><path d="M32 29 L28.5 25.5"/></g>',
   laugh:
     '<g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M3 5 L3 17 M3 11 Q6 9 8 11 L8 17"/><path d="M15 12 Q12 11 12 14 Q12 17 15 16.5 L15 11 L15 17"/>' +

@@ -79,6 +79,7 @@ type Blob = {
   emoteG: SVGGElement;
   emoteUnder: SVGGElement;
   hovered: boolean; pressAt: number; pressX: number; pressY: number;
+  bornAt: number; popped: boolean;
   emoteKind: string; emoteBorn: number; emoteDur: number; nextEmote: number;
   ax: number; axUntil: number; anchorX: number; anchorY: number; // squash axis + anchor after a push
   mouth: SVGElement | null;
@@ -236,6 +237,7 @@ export default function Blobs() {
         emoteG: el.querySelector<SVGGElement>(".blob-emote .over")!,
         emoteUnder: el.querySelector<SVGGElement>(".blob-emote .under")!,
         hovered: false, pressAt: -9, pressX: 0, pressY: 0,
+        bornAt: 0.5 + i * 0.28 + rand() * 0.15, popped: false,
         emoteKind: "", emoteBorn: -99, emoteDur: 0, nextEmote: 0,
         ax: 0, axUntil: 0, anchorX: 0, anchorY: 0,
         mouth: face.querySelector<SVGElement>(".mouth"),
@@ -416,7 +418,7 @@ export default function Blobs() {
         const glyph = EMOTES[kind] ?? "";
         b.emoteG.innerHTML = glyph;
         b.emoteUnder.innerHTML = glyph;
-        b.emoteG.style.color = EMOTE_INK[kind] ?? "";
+        b.emoteG.style.color = kind === "pop" ? b.c.ink : EMOTE_INK[kind] ?? "";
         b.emoteKind = kind;
       }
       b.emoteBorn = t;
@@ -765,7 +767,9 @@ export default function Blobs() {
     // ---------- per-tick ----------
     const pairs = (dt: number) => {
       for (let i = 0; i < blobs.length; i++) {
+        if (blobs[i].bornAt > t) continue;
         for (let j = i + 1; j < blobs.length; j++) {
+          if (blobs[j].bornAt > t) continue;
           const a = blobs[i], c = blobs[j];
           const dx = c.x - a.x, dy = c.y - a.y;
           const dd = Math.hypot(dx, dy) || 1;
@@ -1242,10 +1246,16 @@ export default function Blobs() {
       for (const b of blobs) {
         if (b.stp) tickStep(b);
         if (b.hop) tickHop(b);
+        const life = t - b.bornAt;
+        if (life < 0.75) b.forceRender = true; // every frame of the birth pop is a pose
         if (!b.forceRender && frame % b.hold !== 0) continue;
         b.forceRender = false;
         const c = b.c;
         const half = b.d / 2;
+        // birth: a dot, a fat overshoot, a dip, a settle
+        const BORN = [0.2, 0.55, 1.35, 0.8, 1.12, 0.94, 1.03, 1];
+        const born = life < 0 ? 0 : life < 0.7 ? BORN[Math.min(BORN.length - 1, Math.floor(life * 12))] : 1;
+        set(b, "born", b.el, "scale", String(born));
         const tr = b.tremble && !reduced ? Math.round((rand() - 0.5) * 2) : 0;
         set(b, "el", b.el, "transform", `translate3d(${Math.round(b.x - half + tr)}px, ${Math.round(b.y - half + tr)}px, 0)`);
 
@@ -1349,13 +1359,14 @@ export default function Blobs() {
             const left = b.emoteDur - age;
             // pop in with an overshoot, settle, jiggle, then shrink away
             const POP = [0.2, 1.35, 0.85, 1.1, 0.96, 1];
-            let sc = f < POP.length ? POP[f] : 1;
+            let sc = (f < POP.length ? POP[f] : 1) * (b.emoteKind === "pop" ? 1.7 : 1);
             let rot = f < 2 ? -10 : f === 2 ? 6 : f % 4 < 2 ? 3 : -3;
             if (left < 0.3) { sc = left < 0.1 ? 0.4 : left < 0.2 ? 0.7 : 0.9; rot = 0; }
             const op = left < 0.1 ? 0.5 : 1;
             // top corner of the character, leaning away from it
-            const x = b.d * 0.62;
-            const y = b.d * 0.1 - b.d * 0.3;
+            const burst = b.emoteKind === "pop"; // the birth burst sits on the body, not the corner
+            const x = burst ? b.d * 0.25 : b.d * 0.62;
+            const y = burst ? b.d * 0.31 : b.d * 0.1 - b.d * 0.3;
             set(b, "emo", b.emote, "opacity", String(op));
             set(b, "emot", b.emote, "transform", `translate(${Math.round(x)}px, ${Math.round(y)}px) rotate(${rot + 8}deg) scale(${sc})`);
           }
@@ -1384,6 +1395,9 @@ export default function Blobs() {
       if (pointer.expire && t > pointer.expire) { pointer.known = false; pointer.expire = 0; }
       if (!reduced) pairs(dt);
       for (const b of blobs) {
+        // not born yet: sit invisible and inert until it pops in
+        if (t < b.bornAt) continue;
+        if (!b.popped) { b.popped = true; showEmote(b, "pop", 0.45); b.qv -= 3 * sqGain(b); b.forceRender = true; }
         if (b.grabbed) {
           const tx = pointer.x - b.gx, ty = pointer.y - b.gy;
           b.vx = (tx - b.x) / dt; b.vy = (ty - b.y) / dt;
@@ -1453,8 +1467,8 @@ export default function Blobs() {
 
   return (
     <div ref={rootRef} className="blobs" aria-hidden="true">
-      {CAST.map((c, i) => (
-        <div key={c.name} className="blob" data-name={c.name} style={{ animationDelay: `${400 + i * 120}ms` }}>
+      {CAST.map((c) => (
+        <div key={c.name} className="blob" data-name={c.name} style={{ scale: "0" }}>
           <div className="blob-shadow" />
           <div className="blob-pop">
             <svg className="blob-body" viewBox="0 0 100 100" overflow="visible">

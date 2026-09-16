@@ -231,7 +231,7 @@ body {
   -webkit-user-select: none;
   will-change: transform;
   mix-blend-mode: multiply; /* translucent ink: overlaps print a third color */
-  animation: blob-in 700ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transform-origin: center; /* the birth pop scales from the middle */
 }
 
 .blob.is-grabbed {
@@ -309,17 +309,6 @@ body {
   transform-origin: center;
 }
 
-@keyframes blob-in {
-  from {
-    opacity: 0;
-    scale: 0.4;
-  }
-  to {
-    opacity: 1;
-    scale: 1;
-  }
-}
-
 /* ============================================
    SMALL SCREENS / REDUCED MOTION
    ============================================ */
@@ -338,9 +327,6 @@ body {
   }
   .note {
     animation-delay: 200ms;
-  }
-  .blob {
-    animation: none;
   }
   @keyframes appear {
     from {
