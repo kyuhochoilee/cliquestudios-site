@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { CAST, EMOTES, makeFace, roundedPolygon, type Char } from "./cast";
+import { CAST, EMOTES, INKS, makeFace, mixInks, roundedPolygon, type Char, type InkPass } from "./cast";
 
 /**
  * Five ink creatures on a sheet of paper. Physics and a small state machine
@@ -11,14 +11,14 @@ import { CAST, EMOTES, makeFace, roundedPolygon, type Char } from "./cast";
 
 const FPS = 24; // motion at 24, the outline boil still re-rolls at 12
 const Z_LIFE = 2.6; // seconds a sleep Z takes to float away
-// riso inks for the marks above the head; a black pass sits under each, a hair off
-const EMOTE_INK: Record<string, string> = {
-  laugh: "#ff6c2f",
-  angry: "#f15060",
-  bang: "#ffb511",
-  q: "#0078bf",
-  heart: "#ff48b0",
-  dizzy: "#9d7ad2",
+// ink passes for the marks above the head (bottom to top); a black pass sits under each, a hair off
+const EMOTE_INKS: Record<string, InkPass[]> = {
+  laugh: [{ ink: "yellow", a: 1 }, { ink: "pink", a: 0.8 }], // orange
+  angry: [{ ink: "pink", a: 1 }, { ink: "yellow", a: 0.55 }], // red
+  bang: [{ ink: "yellow", a: 1 }],
+  q: [{ ink: "blue", a: 1 }],
+  heart: [{ ink: "pink", a: 1 }],
+  dizzy: [{ ink: "blue", a: 1 }, { ink: "pink", a: 0.8 }], // purple
 };
 const Z_PATHS = [
   "M3.5 4.5 C7 3.5 11 4 15.5 3.5 L4 15.5 C8 15 12 15.5 16.5 15",
@@ -78,9 +78,11 @@ type Blob = {
   emote: SVGSVGElement;
   emoteG: SVGGElement;
   emoteUnder: SVGGElement;
+  emoteInk1: SVGGElement;
   hovered: boolean; pressAt: number; pressX: number; pressY: number;
   bornAt: number; popped: boolean;
   emoteKind: string; emoteBorn: number; emoteDur: number; nextEmote: number;
+  impact: SVGSVGElement; impactBorn: number; impactX: number; impactY: number; impactAngle: number; impactSize: number;
   ax: number; axUntil: number; anchorX: number; anchorY: number; // squash axis + anchor after a push
   mouth: SVGElement | null;
   d: number;
@@ -204,14 +206,16 @@ export default function Blobs() {
       el.style.height = `${d}px`;
       const body = el.querySelector<SVGSVGElement>(".blob-body")!;
       const face = el.querySelector<SVGSVGElement>(".blob-face")!;
-      el.style.setProperty("--ink", c.ink); // body ink and eyelids share it
+      // the body is printed as one pass per ink; the lids use what the stack prints as
+      el.style.setProperty("--ink", mixInks(c.inks));
       body.style.setProperty("--falloff", `${c.falloff}deg`);
-      body.classList.add(c.ink2 ? "tex-light" : "tex-dark");
+      body.classList.add(c.inks.some((p) => p.ink === "blue") ? "tex-dark" : "tex-light");
       const paths = Array.from(body.querySelectorAll<SVGPathElement>("path"));
-      if (c.ink2 && paths[1]) {
-        paths[1].style.fill = c.ink2;
-        paths[1].style.opacity = String(c.ink2Alpha);
-        paths[1].style.transform = `translate(${(1.8 / scale).toFixed(2)}px, ${(0.8 / scale).toFixed(2)}px)`;
+      paths[0].style.fill = INKS[c.inks[0].ink];
+      if (c.inks[1] && paths[1]) {
+        paths[1].style.fill = INKS[c.inks[1].ink];
+        paths[1].style.opacity = String(c.inks[1].a);
+        paths[1].style.transform = `translate(${(1.6 / scale).toFixed(2)}px, ${(-0.9 / scale).toFixed(2)}px)`; // second drum, a hair off
       } else if (paths[1]) {
         paths[1].remove();
         paths.length = 1;
@@ -236,8 +240,11 @@ export default function Blobs() {
         emote: el.querySelector<SVGSVGElement>(".blob-emote")!,
         emoteG: el.querySelector<SVGGElement>(".blob-emote .over")!,
         emoteUnder: el.querySelector<SVGGElement>(".blob-emote .under")!,
+        emoteInk1: el.querySelector<SVGGElement>(".blob-emote .ink1")!,
         hovered: false, pressAt: -9, pressX: 0, pressY: 0,
-        bornAt: 0.5 + i * 0.28 + rand() * 0.15, popped: false,
+        bornAt: 0.6 + i * 0.8 + rand() * 0.1, popped: false, // one at a time
+        impactBorn: -99, impactX: 0, impactY: 0, impactAngle: 0, impactSize: 1,
+        impact: el.querySelector<SVGSVGElement>(".blob-impact")!,
         emoteKind: "", emoteBorn: -99, emoteDur: 0, nextEmote: 0,
         ax: 0, axUntil: 0, anchorX: 0, anchorY: 0,
         mouth: face.querySelector<SVGElement>(".mouth"),
@@ -320,7 +327,15 @@ export default function Blobs() {
           if (sp > max) { b.vx *= max / sp; b.vy *= max / sp; sp = max; }
         }
         if (sp > 500) go(b, "thrown");
-        else { b.qv += 1.5 * sqGain(b); b.shKick = 0.12; go(b, "idle"); b.until = t + 1; }
+        else {
+          // let go: it falls from where it was held and lands with a thud
+          b.vx = 0; b.vy = 0;
+          go(b, "idle");
+          b.until = t + 1.2;
+          b.hop = { phase: "air", f: 3, frames: 6, dx: 0, dy: 0, power: 0.6, ground: false };
+          b.power = 0.6;
+          b.hold = 1;
+        }
       };
       el.addEventListener("pointerup", release);
       el.addEventListener("pointercancel", release);
@@ -416,9 +431,13 @@ export default function Blobs() {
     const showEmote = (b: Blob, kind: string, dur: number) => {
       if (b.emoteKind !== kind) {
         const glyph = EMOTES[kind] ?? "";
-        b.emoteG.innerHTML = glyph;
+        const stack = kind === "pop" ? b.c.inks : EMOTE_INKS[kind] ?? [];
         b.emoteUnder.innerHTML = glyph;
-        b.emoteG.style.color = kind === "pop" ? b.c.ink : EMOTE_INK[kind] ?? "";
+        b.emoteG.innerHTML = glyph;
+        b.emoteG.style.color = stack[0] ? INKS[stack[0].ink] : "";
+        b.emoteInk1.innerHTML = stack[1] ? glyph : "";
+        b.emoteInk1.style.color = stack[1] ? INKS[stack[1].ink] : "";
+        b.emoteInk1.style.opacity = stack[1] ? String(stack[1].a) : "0";
         b.emoteKind = kind;
       }
       b.emoteBorn = t;
@@ -674,6 +693,7 @@ export default function Blobs() {
           b.eyeScale = 1.25;
           b.eyeScaleUntil = t + 60;
           b.hold = 1;
+          b.power = 0.6; // how high it hangs while held
           b.boilMul = 2.2; // nervous outline while held
           showEmote(b, "bang", 0.5);
           if (b.c.name === "Loaf" && b.prev === "nap") { b.eyeScale = 1.35; b.eyeScaleUntil = t + 0.17; }
@@ -732,7 +752,17 @@ export default function Blobs() {
       }
       go(b, "startled", { src: { x: sx, y: sy }, power });
     };
+    // A burst of lines at the point of contact, sized by how hard the hit was.
+    const showImpact = (b: Blob, nx: number, ny: number, strength: number) => {
+      b.impactBorn = t;
+      b.impactX = b.d / 2 + nx * b.r;
+      b.impactY = b.d / 2 + ny * b.r;
+      b.impactAngle = Math.atan2(ny, nx);
+      b.impactSize = clamp(strength / 500, 0.45, 1.5);
+      b.forceRender = true;
+    };
     const bump = (b: Blob, other: Blob, nx: number, ny: number, impact: number) => {
+      showImpact(b, nx, ny, impact);
       // squash along the contact normal, anchored on the far side so the pushed side caves in
       b.ax = Math.atan2(ny, nx);
       b.axUntil = t + 0.45;
@@ -1177,6 +1207,7 @@ export default function Blobs() {
         b.axUntil = t + 0.4;
         b.anchorX = -wnx * b.r * 0.9;
         b.anchorY = -wny * b.r * 0.9;
+        showImpact(b, wnx, wny, impact);
         b.s = Math.max(b.c.sClamp[0], Math.min(b.s, -sq));
         b.sv = -1.5 * sqGain(b);
         b.stickUntil = t + 0.15;
@@ -1370,6 +1401,19 @@ export default function Blobs() {
             set(b, "emot", b.emote, "transform", `translate(${Math.round(x)}px, ${Math.round(y)}px) rotate(${rot + 8}deg) scale(${sc})`);
           }
         }
+        // impact burst at the contact point: flashes big, then shrinks away
+        {
+          const age = t - b.impactBorn;
+          if (age > 0.4) set(b, "imp", b.impact, "opacity", "0");
+          else {
+            const f = Math.floor(age * 12);
+            const HIT = [0.5, 1.25, 1.05, 0.8, 0.5];
+            const sc = (HIT[Math.min(f, HIT.length - 1)] * b.impactSize).toFixed(2);
+            const w = b.d * 0.45;
+            set(b, "imp", b.impact, "opacity", f >= 4 ? "0.5" : "1");
+            set(b, "impt", b.impact, "transform", `translate(${Math.round(b.impactX - w / 2)}px, ${Math.round(b.impactY - w / 2)}px) rotate(${(b.impactAngle * 180 / Math.PI).toFixed(0)}deg) scale(${sc})`);
+          }
+        }
         // sleep Z's: float up from the head in stop-motion steps, growing and fading
         b.zs.forEach((z, k) => {
           const age = t - z.born;
@@ -1478,9 +1522,19 @@ export default function Blobs() {
             </svg>
             <svg className="blob-face" viewBox="0 0 100 100" overflow="visible" />
           </div>
+          <svg className="blob-impact" viewBox="0 0 40 40" overflow="visible">
+            <g fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <path d="M27 20 L36 20" />
+              <path d="M26 14 L32 8" />
+              <path d="M26 26 L32 32" />
+              <path d="M23 10 L25 4" />
+              <path d="M23 30 L25 36" />
+            </g>
+          </svg>
           <svg className="blob-emote" viewBox="0 0 40 30" overflow="visible">
             <g className="under" />
             <g className="over" />
+            <g className="ink1" />
           </svg>
           <div className="blob-zs">
             {[0, 1, 2].map((k) => (

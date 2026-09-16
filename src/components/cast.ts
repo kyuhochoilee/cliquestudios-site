@@ -15,11 +15,33 @@ export type Personality = {
 
 export type Gait = "dart" | "drift" | "amble" | "hoppy";
 
+/** The four drums. Everything on the page is one of these or an overlap of them. */
+export const INKS = {
+  pink: "#ff48b0", // Fluorescent Pink
+  blue: "#0078bf", // Blue
+  yellow: "#ffe800", // Yellow
+  black: "#1b1917",
+} as const;
+export type InkName = keyof typeof INKS;
+export type InkPass = { ink: InkName; a: number };
+
+/** What a stack of translucent ink passes prints as (multiply, like the real thing). */
+export function mixInks(stack: InkPass[]): string {
+  let r = 1, g = 1, b = 1;
+  for (const p of stack) {
+    const hex = INKS[p.ink];
+    const ir = parseInt(hex.slice(1, 3), 16) / 255, ig = parseInt(hex.slice(3, 5), 16) / 255, ib = parseInt(hex.slice(5, 7), 16) / 255;
+    r = r * (1 - p.a) + r * ir * p.a;
+    g = g * (1 - p.a) + g * ig * p.a;
+    b = b * (1 - p.a) + b * ib * p.a;
+  }
+  const h = (v: number) => Math.round(v * 255).toString(16).padStart(2, "0");
+  return `#${h(r)}${h(g)}${h(b)}`;
+}
+
 export type Char = {
   name: string;
-  ink: string;
-  ink2: string | null;
-  ink2Alpha: number;
+  inks: InkPass[]; // printed bottom to top
   falloff: number;
   verts: [number, number][];
   radius: number;
@@ -61,9 +83,7 @@ export const CAST: Char[] = [
   {
     // A zippy little square, thrilled by everything.
     name: "Fizz",
-    ink: "#ff48b0",
-    ink2: "#d61f87",
-    ink2Alpha: 0.45,
+    inks: [{ ink: "pink", a: 1 }],
     falloff: 115,
     verts: [[24, 20], [80, 26], [76, 80], [20, 76]],
     radius: 20,
@@ -100,9 +120,7 @@ export const CAST: Char[] = [
   {
     // A heavy, contented loaf that is asleep more often than not.
     name: "Loaf",
-    ink: "#0078bf",
-    ink2: "#ff48b0",
-    ink2Alpha: 0.55,
+    inks: [{ ink: "blue", a: 1 }],
     falloff: 250,
     verts: [[10, 42], [30, 18], [70, 16], [92, 40], [86, 78], [16, 82]],
     radius: 15,
@@ -139,9 +157,7 @@ export const CAST: Char[] = [
   {
     // Wide-eyed and nosy; comes over to see what you are doing.
     name: "Pip",
-    ink: "#00a95c",
-    ink2: null,
-    ink2Alpha: 0,
+    inks: [{ ink: "yellow", a: 1 }, { ink: "blue", a: 0.72 }],
     falloff: 30,
     verts: [[89, 50], [59, 12], [13, 18], [13, 82], [59, 88]],
     radius: 11,
@@ -178,9 +194,7 @@ export const CAST: Char[] = [
   {
     // A plump, bashful pear that blushes when anyone comes close.
     name: "Nib",
-    ink: "#ff6c2f",
-    ink2: "#e04e14",
-    ink2Alpha: 0.45,
+    inks: [{ ink: "yellow", a: 1 }, { ink: "pink", a: 0.82 }],
     falloff: 200,
     verts: [[50, 10], [78, 30], [86, 64], [64, 92], [36, 92], [14, 64], [22, 30]],
     radius: 16,
@@ -218,9 +232,7 @@ export const CAST: Char[] = [
   {
     // A jolly jumping bean that treats the page as a trampoline.
     name: "Bop",
-    ink: "#ffe800",
-    ink2: "#ffb511",
-    ink2Alpha: 0.45,
+    inks: [{ ink: "yellow", a: 1 }],
     falloff: 300,
     verts: [[52, 6], [80, 30], [76, 74], [48, 94], [20, 70], [24, 26]],
     radius: 10,

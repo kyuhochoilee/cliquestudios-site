@@ -6,6 +6,10 @@ Corporate website for Clique Studios LLC, served at https://cliquestudios.org by
 
 Fraunces (wordmark) and Figtree (body) are self-hosted through `next/font/google`; no requests go to Google at runtime.
 
+## Inks
+
+The whole page is printed with four drums: Fluorescent Pink `#ff48b0`, Blue `#0078bf`, Yellow `#ffe800`, and Black `#1b1917` (`INKS` in `src/components/cast.ts`). Every other color is an overlap: each pass is a separate layer that multiplies over the one below and lands a hair off. Pip is yellow with a blue pass, Nib is yellow with a pink pass, the orange and red marks are pink and yellow together.
+
 ## The characters
 
 Five ink creatures wander the page (`src/components/Blobs.tsx`). Their shapes, faces, colors, and personalities live in `src/components/cast.ts`; the physics and state machine (wander, hop, nap, greet, chase, startle, sulk, celebrate, grab and throw) live in the component. The DOM is written 24 times a second, with the outline boil re-rolled at 12, for a stop-motion feel. The risograph look comes from `src/components/RisoDefs.tsx` (SVG filters) and the tokens at the top of `src/app/globals.css`.

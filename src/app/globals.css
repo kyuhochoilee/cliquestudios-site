@@ -377,3 +377,23 @@ body {
   transform-box: fill-box;
   transform-origin: center;
 }
+
+/* Impact burst at the point of contact */
+.blob-impact {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 45%;
+  height: 45%;
+  color: var(--color-fg);
+  opacity: 0;
+  transform-origin: center;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* second ink pass on a mark: multiplies over the first, a hair off */
+.blob-emote .ink1 {
+  mix-blend-mode: multiply;
+  transform: translate(1px, -0.8px);
+}
