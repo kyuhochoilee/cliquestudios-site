@@ -137,21 +137,23 @@ export default function Blobs() {
     const small = window.innerWidth < 640;
     const count = CAST.length;
     const sizeMul = small ? 0.62 : 1;
-    const content = document.querySelector<HTMLElement>(".content");
+    // things the cast keeps off: the note and the wordmark
+    const keepEls = Array.from(root.parentElement?.querySelectorAll<HTMLElement>("[data-keep]") ?? []);
 
     // ---------- world ----------
+    type Rect = { l: number; t: number; r: number; b: number };
     let W = 0;
     let H = 0;
-    let keep = { l: 0, t: 0, r: 0, b: 0 };
+    let keeps: Rect[] = [];
     const measure = () => {
       const rr = root.getBoundingClientRect();
       W = rr.width;
       H = rr.height;
-      if (content) {
-        const c = content.getBoundingClientRect();
-        const m = 18;
-        keep = { l: c.left - rr.left - m, t: c.top - rr.top - m, r: c.right - rr.left + m, b: c.bottom - rr.top + m };
-      }
+      const m = 18;
+      keeps = keepEls.map((el) => {
+        const c = el.getBoundingClientRect();
+        return { l: c.left - rr.left - m, t: c.top - rr.top - m, r: c.right - rr.left + m, b: c.bottom - rr.top + m };
+      });
     };
     measure();
 
@@ -159,8 +161,11 @@ export default function Blobs() {
     let t = 0; // simulation seconds
     let chaseActive = false;
 
-    const inKeep = (x: number, y: number, r: number) =>
-      x + r > keep.l && x - r < keep.r && y + r > keep.t && y - r < keep.b;
+    const hitKeep = (x: number, y: number, r: number): Rect | null => {
+      for (const k of keeps) if (x + r > k.l && x - r < k.r && y + r > k.t && y - r < k.b) return k;
+      return null;
+    };
+    const inKeep = (x: number, y: number, r: number) => hitKeep(x, y, r) !== null;
 
     const openSpot = (r: number) => {
       let x = W / 2;
@@ -175,7 +180,8 @@ export default function Blobs() {
     const nudge = (x: number, y: number, r: number) => {
       x = clamp(x, r, W - r);
       y = clamp(y, r, H - r);
-      if (!inKeep(x, y, r)) return { x, y };
+      const keep = hitKeep(x, y, r);
+      if (!keep) return { x, y };
       const pl = x + r - keep.l, pr = keep.r - (x - r), pt = y + r - keep.t, pb = keep.b - (y - r);
       const m = Math.min(pl, pr, pt, pb);
       if (m === pl) x -= pl + 10; else if (m === pr) x += pr + 10; else if (m === pt) y -= pt + 10; else y += pb + 10;
@@ -1120,7 +1126,8 @@ export default function Blobs() {
         if (dd < reach) step(b, dx / dd, dy / dd, ((reach - dd) / reach) * 60 * b.c.flinchForce * (0.5 + P.jumpy), 0.25);
       }
       // keep off the text: ease the position out, no velocity, so it never slides
-      if (inKeep(b.x, b.y, r)) {
+      const keep = hitKeep(b.x, b.y, r);
+      if (keep) {
         const pl = b.x + r - keep.l, pr = keep.r - (b.x - r), pt = b.y + r - keep.t, pb = keep.b - (b.y - r);
         const m = Math.min(pl, pr, pt, pb);
         const k = Math.min(1, 6 * dt);
